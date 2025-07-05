@@ -18,7 +18,7 @@ export class OauthService {
   async getAccessToken(code: string): Promise<any> {
     const client_id = process.env.GHL_CLIENT_ID;
     const client_secret = process.env.GHL_CLIENT_SECRET;
-    const redirect_uri = 'http://localhost:3000/';
+    const redirect_uri = 'http://localhost:3000/oauth/callback';
     const grant_type = 'authorization_code';
 
     const params = new URLSearchParams();
@@ -27,7 +27,7 @@ export class OauthService {
     params.append('grant_type', grant_type);
     params.append('code', code);
     params.append('redirect_uri', redirect_uri);
-    params.append('user_type', "Location");
+    params.append('user_type', 'Location');
     // No enviar scopes en la petición de token según la documentación de GHL
 
     try {
@@ -43,13 +43,20 @@ export class OauthService {
       );
       return response.data;
     } catch (error) {
-      // Log detallado para depuración
-      console.error('Error al solicitar token a GHL:', {
-        sent_params: Object.fromEntries(params.entries()),
-        response_data: error.response?.data,
-        status: error.response?.status,
-        message: error.message,
-      });
+      // Log detallado para depuración con branding y color
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const colors = require('colors');
+      const brand = colors.bgBlue(colors.white(colors.bold(' WhatHub '))) + colors.bgGreen(colors.white(colors.bold(' GateWay ')));
+      console.error(
+        brand,
+        colors.red('Error al solicitar token a GHL:'),
+        {
+          sent_params: Object.fromEntries(params.entries()),
+          response_data: error.response?.data,
+          status: error.response?.status,
+          message: error.message,
+        }
+      );
       throw new Error(
         `GHL Token Error: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`
       );

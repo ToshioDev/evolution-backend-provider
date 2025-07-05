@@ -48,4 +48,14 @@ export class EvolutionController {
     console.log(`Received message from ${remoteJid} on instance ${instance}:`, message);
     return 'Message received';
   }
+
+  @Post('webhook')
+  async evolutionWebhook(@Body() body: any, @Res() res) {
+    // Loguear el payload recibido con branding y color
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const colors = require('colors');
+    const brand = colors.bgBlue(colors.white(colors.bold(' WhatHub '))) + colors.bgGreen(colors.white(colors.bold(' GateWay ')));
+    console.log(brand, colors.green('Webhook recibido de Evolution:'), colors.blue(JSON.stringify(body)));
+    return res.status(HttpStatus.OK).json({ status: 'success', message: 'Webhook recibido' });
+  }
 }

@@ -31,10 +31,9 @@ export class OauthController {
     }
     try {
       const tokenData = await this.oauthService.getAccessToken(code);
-      return res.status(HttpStatus.OK).json({
-        status: 'success',
-        token: tokenData,
-      });
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      // Puedes pasar el token como query param si lo necesitas, aquí solo redirige
+      return res.redirect(frontendUrl);
     } catch (error) {
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         status: 'error',

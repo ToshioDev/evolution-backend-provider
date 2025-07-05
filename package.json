@@ -26,6 +26,8 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "axios": "^1.10.0",
+    "chalk": "^5.4.1",
+    "colors": "^1.4.0",
     "dotenv": "^17.0.1",
     "mongoose": "^8.16.1",
     "passport": "^0.7.0",
