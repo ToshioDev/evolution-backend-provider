@@ -22,13 +22,12 @@ export class AuthService {
       username,
       email,
       password: hashedPassword,
-      locationId: locationId || 'JVNpuC2h3NmmWohtPTQ5', // valor por defecto
+      locationId: locationId || 'JVNpuC2h3NmmWohtPTQ5', 
     };
 
     const user = await this.userService.create(userData);
     const userDoc = user as any;
 
-    // Generar token
     const token = await this.userService.generateUserToken(
       userDoc._id.toString(),
     );
@@ -47,7 +46,6 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const { email, password } = loginDto;
 
-    // Buscar usuario
     const user = await this.userService.findByEmail(email);
     if (!user) {
       throw new HttpException(
@@ -56,7 +54,6 @@ export class AuthService {
       );
     }
 
-    // Verificar contraseña
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new HttpException(
@@ -67,7 +64,6 @@ export class AuthService {
 
     const userDoc = user as any;
 
-    // Generar nuevo token
     const token = await this.userService.generateUserToken(
       userDoc._id.toString(),
     );

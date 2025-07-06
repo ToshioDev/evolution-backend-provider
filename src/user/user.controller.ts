@@ -39,34 +39,43 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @Get(':id')
+  @Get('me')
   @UseGuards(AuthGuard)
-  async findById(@Param('id') id: string) {
-    return this.userService.findById(id);
+  async getCurrentUser(@CurrentUser() user: any) {
+    return {
+      status: 'success',
+      message: 'Datos del usuario autenticado',
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        locationId: user.locationId,
+        evolutionInstances: user.evolutionInstances,
+      },
+    };
   }
 
-  @Put(':id')
+  @Get('me/location')
   @UseGuards(AuthGuard)
-  async update(@Param('id') id: string, @Body() data: Partial<User>) {
-    return this.userService.update(id, data);
+  async getCurrentUserLocation(@LocationId() locationId: string) {
+    return {
+      status: 'success',
+      message: 'LocationId del usuario autenticado',
+      data: {
+        locationId,
+      },
+    };
   }
 
-  @Delete(':id')
+  @Post('me/token/revoke')
   @UseGuards(AuthGuard)
-  async delete(@Param('id') id: string) {
-    await this.userService.delete(id);
-    return { status: 'success', message: 'User deleted' };
-  }
-
-  @Get('location/:locationId')
-  @UseGuards(AuthGuard)
-  async findByLocationId(@Param('locationId') locationId: string) {
+  async revokeToken(@CurrentUser() user: any) {
     try {
-      const user = await this.userService.findByLocationId(locationId);
-      if (!user) {
-        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-      }
-      return { status: 'success', user };
+      await this.userService.revokeUserToken(user._id);
+      return {
+        status: 'success',
+        message: 'Token revocado exitosamente',
+      };
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
@@ -110,45 +119,37 @@ export class UserController {
     };
   }
 
-  @Get('me')
+  @Get('location/:locationId')
   @UseGuards(AuthGuard)
-  async getCurrentUser(@CurrentUser() user: any) {
-    return {
-      status: 'success',
-      message: 'Datos del usuario autenticado',
-      data: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        locationId: user.locationId,
-        evolutionInstances: user.evolutionInstances,
-      },
-    };
-  }
-
-  @Get('me/location')
-  @UseGuards(AuthGuard)
-  async getCurrentUserLocation(@LocationId() locationId: string) {
-    return {
-      status: 'success',
-      message: 'LocationId del usuario autenticado',
-      data: {
-        locationId,
-      },
-    };
-  }
-
-  @Post('me/token/revoke')
-  @UseGuards(AuthGuard)
-  async revokeToken(@CurrentUser() user: any) {
+  async findByLocationId(@Param('locationId') locationId: string) {
     try {
-      await this.userService.revokeUserToken(user._id);
-      return {
-        status: 'success',
-        message: 'Token revocado exitosamente',
-      };
+      const user = await this.userService.findByLocationId(locationId);
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      return { status: 'success', user };
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
+  }
+
+  // Rutas con parámetros AL FINAL
+  @Get(':id')
+  @UseGuards(AuthGuard)
+  async findById(@Param('id') id: string) {
+    return this.userService.findById(id);
+  }
+
+  @Put(':id')
+  @UseGuards(AuthGuard)
+  async update(@Param('id') id: string, @Body() data: Partial<User>) {
+    return this.userService.update(id, data);
+  }
+
+  @Delete(':id')
+  @UseGuards(AuthGuard)
+  async delete(@Param('id') id: string) {
+    await this.userService.delete(id);
+    return { status: 'success', message: 'User deleted' };
   }
 }

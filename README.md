@@ -80,7 +80,67 @@ FRONTEND_URL=http://localhost:5173
 
 ---
 
-### 👥 Gestión de Usuarios
+### � Autenticación y Autorización
+
+#### `POST /auth/register`
+
+- **Descripción**: Registrar un nuevo usuario en el sistema
+- **Body**:
+  ```json
+  {
+    "username": "string",
+    "email": "string",
+    "password": "string",
+    "locationId": "string (opcional)"
+  }
+  ```
+- **Respuesta**:
+  ```json
+  {
+    "status": "success",
+    "message": "Usuario registrado exitosamente",
+    "data": {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "user": {
+        "id": "user_id",
+        "username": "username",
+        "email": "email@example.com",
+        "locationId": "JVNpuC2h3NmmWohtPTQ5"
+      }
+    }
+  }
+  ```
+
+#### `POST /auth/login`
+
+- **Descripción**: Iniciar sesión y obtener token de autenticación
+- **Body**:
+  ```json
+  {
+    "email": "string",
+    "password": "string"
+  }
+  ```
+- **Respuesta**:
+  ```json
+  {
+    "status": "success",
+    "message": "Login exitoso",
+    "data": {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "user": {
+        "id": "user_id",
+        "username": "username",
+        "email": "email@example.com",
+        "locationId": "JVNpuC2h3NmmWohtPTQ5"
+      }
+    }
+  }
+  ```
+
+---
+
+### �👥 Gestión de Usuarios
 
 #### `POST /users`
 
@@ -150,14 +210,193 @@ FRONTEND_URL=http://localhost:5173
   }
   ```
 
+#### `GET /users/me`
+
+- **Descripción**: Obtener datos del usuario autenticado
+- **Headers**: `Authorization: Bearer <token>`
+- **Respuesta**:
+  ```json
+  {
+    "status": "success",
+    "message": "Datos del usuario autenticado",
+    "data": {
+      "id": "user_id",
+      "username": "username",
+      "email": "email@example.com",
+      "locationId": "JVNpuC2h3NmmWohtPTQ5",
+      "evolutionInstances": [...]
+    }
+  }
+  ```
+
+#### `GET /users/me/location`
+
+- **Descripción**: Obtener solo el locationId del usuario autenticado
+- **Headers**: `Authorization: Bearer <token>`
+- **Respuesta**:
+  ```json
+  {
+    "status": "success",
+    "message": "LocationId del usuario autenticado",
+    "data": {
+      "locationId": "JVNpuC2h3NmmWohtPTQ5"
+    }
+  }
+  ```
+
+#### `GET /users/profile`
+
+- **Descripción**: Obtener perfil completo del usuario con token personalizado
+- **Headers**: `Authorization: Bearer <token>`
+- **Respuesta**:
+  ```json
+  {
+    "status": "success",
+    "message": "Perfil obtenido con token de usuario",
+    "data": {
+      "userData": {
+        "id": "user_id",
+        "username": "username",
+        "email": "email@example.com",
+        "locationId": "JVNpuC2h3NmmWohtPTQ5",
+        "userToken": "custom_token",
+        "ghlAuth": {...},
+        "evolutionInstances": [...]
+      },
+      "locationId": "JVNpuC2h3NmmWohtPTQ5",
+      "message": "Este endpoint requiere token de usuario personalizado"
+    }
+  }
+  ```
+
+#### `PUT /users/profile`
+
+- **Descripción**: Actualizar perfil del usuario autenticado
+- **Headers**: `Authorization: Bearer <token>`
+- **Body**: Datos parciales del usuario a actualizar
+- **Respuesta**:
+  ```json
+  {
+    "status": "success",
+    "message": "Perfil actualizado con token de usuario",
+    "data": {
+      "userId": "user_id",
+      "username": "username",
+      "email": "email@example.com",
+      "locationId": "JVNpuC2h3NmmWohtPTQ5",
+      "message": "Este endpoint requiere token de usuario personalizado",
+      "receivedData": {...}
+    }
+  }
+  ```
+
+#### `POST /users/me/token/revoke`
+
+- **Descripción**: Revocar el token del usuario autenticado
+- **Headers**: `Authorization: Bearer <token>`
+- **Respuesta**:
+  ```json
+  {
+    "status": "success",
+    "message": "Token revocado exitosamente"
+  }
+  ```
+  ```
+
+  ```
+
 ---
 
-### 📱 Evolution API - Gestión de Instancias
+### �️ Custom Decorators para Autenticación
+
+El sistema incluye decorators personalizados para simplificar el manejo de datos del usuario autenticado:
+
+#### `@CurrentUser()`
+
+- **Descripción**: Extrae el usuario completo de la request
+- **Uso**:
+  ```typescript
+  @Get('endpoint')
+  @UseGuards(AuthGuard)
+  async method(@CurrentUser() user: any) {
+    // user contiene todos los datos del usuario autenticado
+  }
+  ```
+- **Parámetro opcional**: Puede recibir una key específica del usuario
+  ```typescript
+  @CurrentUser('username') username: string
+  ```
+
+#### `@LocationId()`
+
+- **Descripción**: Extrae únicamente el locationId del usuario autenticado
+- **Uso**:
+  ```typescript
+  @Get('endpoint')
+  @UseGuards(AuthGuard)
+  async method(@LocationId() locationId: string) {
+    // locationId contiene el locationId del usuario
+  }
+  ```
+
+#### `@UserData()`
+
+- **Descripción**: Extrae un objeto estructurado con los datos principales del usuario
+- **Uso**:
+  ```typescript
+  @Get('endpoint')
+  @UseGuards(AuthGuard)
+  async method(@UserData() userData: any) {
+    // userData contiene: id, username, email, locationId, userToken, ghlAuth, evolutionInstances
+  }
+  ```
+- **Estructura retornada**:
+  ```typescript
+  {
+    id: string,
+    username: string,
+    email: string,
+    locationId: string,
+    userToken: string,
+    ghlAuth: object,
+    evolutionInstances: array
+  }
+  ```
+
+#### Ejemplo de implementación completa:
+
+```typescript
+@Controller('example')
+export class ExampleController {
+  @Get('user-info')
+  @UseGuards(AuthGuard)
+  async getUserInfo(
+    @CurrentUser() user: any,
+    @LocationId() locationId: string,
+    @UserData() userData: any,
+  ) {
+    return {
+      fullUser: user, // Usuario completo
+      location: locationId, // Solo locationId
+      structured: userData, // Datos estructurados
+    };
+  }
+
+  @Get('username-only')
+  @UseGuards(AuthGuard)
+  async getUsername(@CurrentUser('username') username: string) {
+    return { username };
+  }
+}
+```
+
+---
+
+### �📱 Evolution API - Gestión de Instancias
 
 #### `POST /evolution/instance/create-basic`
 
 - **Descripción**: Crear una instancia básica de WhatsApp con nombre único automático
-- **Headers**: `Authorization: Bearer <token>`
 - **Body**:
   ```json
   {
@@ -181,7 +420,6 @@ FRONTEND_URL=http://localhost:5173
 #### `GET /evolution/instances`
 
 - **Descripción**: Obtener todas las instancias de Evolution API
-- **Headers**: `Authorization: Bearer <token>`
 - **Respuesta**:
   ```json
   {
@@ -202,7 +440,6 @@ FRONTEND_URL=http://localhost:5173
 #### `GET /evolution/instance/:instanceName`
 
 - **Descripción**: Obtener información específica de una instancia
-- **Headers**: `Authorization: Bearer <token>`
 - **Parámetros**: `instanceName` (nombre de la instancia)
 - **Respuesta**:
   ```json
@@ -222,7 +459,6 @@ FRONTEND_URL=http://localhost:5173
 #### `DELETE /evolution/instance/:instanceName`
 
 - **Descripción**: Eliminar una instancia específica
-- **Headers**: `Authorization: Bearer <token>`
 - **Parámetros**: `instanceName` (nombre de la instancia)
 - **Respuesta**:
   ```json
@@ -240,7 +476,6 @@ FRONTEND_URL=http://localhost:5173
 #### `POST /evolution/message`
 
 - **Descripción**: Enviar mensaje de texto a través de Evolution API
-- **Headers**: `Authorization: Bearer <token>`
 - **Body**:
   ```json
   {
@@ -283,7 +518,6 @@ FRONTEND_URL=http://localhost:5173
 #### `POST /evolution/leadconnector/oauth`
 
 - **Descripción**: Manejo interno de OAuth para Lead Connector
-- **Headers**: `Authorization: Bearer <token>`
 - **Body**: Datos específicos de Lead Connector
 - **Respuesta**:
   ```json
@@ -334,7 +568,14 @@ FRONTEND_URL=http://localhost:5173
 
 ## 🔄 Flujos de Trabajo
 
-### 1. Flujo OAuth2 completo
+### 1. Flujo de Autenticación completo
+
+1. `POST /auth/register` → Registro de nuevo usuario
+2. `POST /auth/login` → Obtención de token JWT
+3. Uso del token en headers: `Authorization: Bearer <token>`
+4. Acceso a endpoints protegidos con decorators `@CurrentUser`, `@LocationId`, `@UserData`
+
+### 2. Flujo OAuth2 completo
 
 1. `GET /oauth` → Redirección a GHL
 2. Usuario autoriza en GHL
@@ -342,14 +583,15 @@ FRONTEND_URL=http://localhost:5173
 4. Actualización automática de `ghlAuth` en el usuario correspondiente
 5. Redirección al frontend
 
-### 2. Flujo de creación de instancia WhatsApp
+### 3. Flujo de creación de instancia WhatsApp
 
-1. `POST /evolution/instance/create-basic` con número opcional
-2. Generación automática de nombre único (`wh_12345`)
-3. Creación de instancia en Evolution API
-4. Retorno de datos de instancia y QR code
+1. `POST /auth/login` → Obtener token de autenticación
+2. `POST /evolution/instance/create-basic` con número opcional
+3. Generación automática de nombre único (`wh_12345`)
+4. Creación de instancia en Evolution API
+5. Retorno de datos de instancia y QR code
 
-### 3. Flujo de mensajería
+### 4. Flujo de mensajería
 
 1. `POST /evolution/message` → Envío de mensaje
 2. `POST /evolution/webhook` → Recepción de respuestas
@@ -378,11 +620,13 @@ npm run start:prod
 
 ## 📋 Notas Importantes
 
-- **Autenticación**: La mayoría de endpoints requieren token Bearer
+- **Autenticación**: Los endpoints `/auth/*` no requieren token, el resto sí requieren token Bearer
+- **Decorators personalizados**: Usa `@CurrentUser()`, `@LocationId()`, `@UserData()` para simplificar el acceso a datos del usuario
 - **Nombres únicos**: Las instancias de Evolution se generan con nombres únicos automáticamente
 - **Integración automática**: El OAuth actualiza automáticamente los datos del usuario
 - **Logs detallados**: Todos los servicios incluyen logs con branding WhatHub GateWay
 - **Manejo de errores**: Respuestas consistentes con formato estándar
+- **Guards de protección**: Usa `@UseGuards(AuthGuard)` en endpoints que requieren autenticación
 
 ---
 
