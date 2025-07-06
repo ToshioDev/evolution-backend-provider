@@ -2,8 +2,6 @@ import {
   Controller,
   Post,
   Body,
-  Headers,
-  Req,
   Res,
   HttpStatus,
   Get,
@@ -23,7 +21,6 @@ export class EvolutionController {
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
   ): Promise<{ status: string; message: string }> {
-
     const remoteJid = `${contact.phone}@whatsapp.net`;
     try {
       await this.evolutionService.sendMessageToEvolution(
@@ -69,7 +66,6 @@ export class EvolutionController {
   async createBasicInstance(
     @Body('number') number?: string,
   ): Promise<{ status: string; message: string; data?: any }> {
-
     try {
       const result = await this.evolutionService.createBasicInstance(number);
       return {
@@ -85,12 +81,10 @@ export class EvolutionController {
     }
   }
 
- 
   @Delete('instance/:instanceName')
   async deleteInstance(
     @Param('instanceName') instanceName: string,
   ): Promise<{ status: string; message: string; data?: any }> {
-
     try {
       const result = await this.evolutionService.deleteInstance(instanceName);
       return {
@@ -107,8 +101,11 @@ export class EvolutionController {
   }
 
   @Get('instances')
-  async getAllInstances(): Promise<{ status: string; message: string; data?: any }> {
-
+  async getAllInstances(): Promise<{
+    status: string;
+    message: string;
+    data?: any;
+  }> {
     try {
       const result = await this.evolutionService.getAllInstances();
       return {

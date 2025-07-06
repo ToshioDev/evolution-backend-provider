@@ -15,7 +15,7 @@ export interface GhlAuth {
   locationId: string;
   isBulkInstallation?: boolean;
   userId: string;
-  [key: string]: any; 
+  [key: string]: any;
 }
 
 @Schema({ timestamps: true })
@@ -31,6 +31,9 @@ export class User {
 
   @Prop({ default: 'JVNpuC2h3NmmWohtPTQ5' })
   locationId: string;
+
+  @Prop({ unique: true, sparse: true })
+  userToken: string;
 
   @Prop({
     type: Object,

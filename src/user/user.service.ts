@@ -63,4 +63,33 @@ export class UserService implements OnModuleInit {
   async findByLocationId(locationId: string): Promise<User | null> {
     return this.userModel.findOne({ locationId }).exec();
   }
+
+  async findByGhlAccessToken(accessToken: string): Promise<User | null> {
+    return this.userModel
+      .findOne({ 'ghlAuth.access_token': accessToken })
+      .exec();
+  }
+
+  async findByUserToken(userToken: string): Promise<User | null> {
+    return this.userModel.findOne({ userToken }).exec();
+  }
+
+  async findByToken(token: string): Promise<User | null> {
+    return this.userModel.findOne({ userToken: token }).exec();
+  }
+
+  async generateUserToken(userId: string): Promise<string> {
+    const timestamp = Date.now();
+    const randomPart = Math.random().toString(36).substring(2, 15);
+    const userToken = `usr_${timestamp}_${randomPart}`;
+    await this.userModel.findByIdAndUpdate(userId, { userToken }).exec();
+
+    return userToken;
+  }
+
+  async revokeUserToken(userId: string): Promise<void> {
+    await this.userModel
+      .findByIdAndUpdate(userId, { $unset: { userToken: 1 } })
+      .exec();
+  }
 }
