@@ -7,12 +7,9 @@ import { OnModuleInit } from '@nestjs/common';
 
 @Injectable()
 export class UserService implements OnModuleInit {
-  constructor(
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
-  ) {}
+  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
   async onModuleInit() {
-    // Forzar la creación de la colección y los índices al arrancar el servicio
     await this.userModel.createCollection();
     await this.userModel.syncIndexes();
   }
@@ -37,7 +34,9 @@ export class UserService implements OnModuleInit {
   }
 
   async update(id: string, data: Partial<User>): Promise<User> {
-    const user = await this.userModel.findByIdAndUpdate(id, data, { new: true }).exec();
+    const user = await this.userModel
+      .findByIdAndUpdate(id, data, { new: true })
+      .exec();
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
@@ -45,5 +44,23 @@ export class UserService implements OnModuleInit {
   async delete(id: string): Promise<void> {
     const result = await this.userModel.findByIdAndDelete(id).exec();
     if (!result) throw new NotFoundException('User not found');
+  }
+
+  async updateGhlAuthByLocationId(
+    locationId: string,
+    ghlAuth: GhlAuth,
+  ): Promise<User> {
+    const user = await this.userModel
+      .findOneAndUpdate({ locationId }, { ghlAuth }, { new: true })
+      .exec();
+    if (!user)
+      throw new NotFoundException(
+        `User with locationId ${locationId} not found`,
+      );
+    return user;
+  }
+
+  async findByLocationId(locationId: string): Promise<User | null> {
+    return this.userModel.findOne({ locationId }).exec();
   }
 }

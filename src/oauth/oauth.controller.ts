@@ -1,12 +1,10 @@
 import { Controller, Post, Body, Headers, Res, HttpStatus, Get, Req, UseGuards } from '@nestjs/common';
 import { OauthService } from './oauth.service';
-import { AuthGuard } from '@nestjs/passport';
 
 @Controller('oauth')
 export class OauthController {
   constructor(private readonly oauthService: OauthService) {}
 
-  // Inicia el flujo OAuth2 en la raíz /oauth
   @Get()
   async oauthRedirect(@Req() req, @Res() res) {
     const clientId = process.env.GHL_CLIENT_ID;
@@ -19,7 +17,6 @@ export class OauthController {
     return res.redirect(url);
   }
 
-  // Callback del proveedor OAuth2
   @Get('callback')
   async oauthCallback(@Req() req, @Res() res) {
     const code = req.query.code;
@@ -30,9 +27,8 @@ export class OauthController {
       });
     }
     try {
-      const tokenData = await this.oauthService.getAccessToken(code);
+      await this.oauthService.getAccessToken(code);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      // Puedes pasar el token como query param si lo necesitas, aquí solo redirige
       return res.redirect(frontendUrl);
     } catch (error) {
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({

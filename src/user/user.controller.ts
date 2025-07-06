@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Put,
+  Delete,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './user.schema';
 
@@ -35,5 +45,18 @@ export class UserController {
   async delete(@Param('id') id: string) {
     await this.userService.delete(id);
     return { status: 'success', message: 'User deleted' };
+  }
+
+  @Get('location/:locationId')
+  async findByLocationId(@Param('locationId') locationId: string) {
+    try {
+      const user = await this.userService.findByLocationId(locationId);
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      return { status: 'success', user };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 }

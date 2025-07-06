@@ -1,4 +1,15 @@
-import { Controller, Post, Body, Headers, Req, Res, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  Req,
+  Res,
+  HttpStatus,
+  Get,
+  Delete,
+  Param,
+} from '@nestjs/common';
 import { EvolutionService } from './evolution.service';
 
 @Controller('evolution')
@@ -11,51 +22,105 @@ export class EvolutionController {
     @Body('message') message: string,
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
-    @Headers('Authorization') authHeader: string,
   ): Promise<{ status: string; message: string }> {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return { status: 'error', message: 'Unauthorized' };
-    }
 
     const remoteJid = `${contact.phone}@whatsapp.net`;
     try {
-      await this.evolutionService.sendMessageToEvolution('text', remoteJid, message);
+      await this.evolutionService.sendMessageToEvolution(
+        'text',
+        remoteJid,
+        message,
+      );
       return { status: 'success', message: 'Mensaje enviado a Evolution API' };
     } catch (error) {
-      return { status: 'error', message: 'Número inválido o error al contactar Evolution API' };
-    }
-  }
-  @Post('/leadconnector/oauth')
-  async leadConnectorOAuth(
-    @Body() body: any,
-    @Headers('Authorization') authHeader: string,
-    @Res() res
-  ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(HttpStatus.UNAUTHORIZED).json({ status: 'error', message: 'Unauthorized' });
-    }
-    try {
-      const result = await this.evolutionService.handleLeadConnectorOAuth(body);
-      return res.status(HttpStatus.OK).json({ status: 'success', data: result });
-    } catch (error) {
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ status: 'error', message: error.message });
+      return {
+        status: 'error',
+        message: 'Número inválido o error al contactar Evolution API',
+      };
     }
   }
 
   handleIncomingMessage(@Body() body: any): string {
     const { remoteJid, instance, message } = body;
-    // Aquí puedes procesar el mensaje según el remoteJid y la instancia
-    console.log(`Received message from ${remoteJid} on instance ${instance}:`, message);
+    console.log(
+      `Received message from ${remoteJid} on instance ${instance}:`,
+      message,
+    );
     return 'Message received';
   }
 
   @Post('webhook')
   async evolutionWebhook(@Body() body: any, @Res() res) {
-    // Loguear el payload recibido con branding y color
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const colors = require('colors');
-    const brand = colors.bgBlue(colors.white(colors.bold(' WhatHub '))) + colors.bgGreen(colors.white(colors.bold(' GateWay ')));
-    console.log(brand, colors.green('Webhook recibido de Evolution:'), colors.blue(JSON.stringify(body)));
-    return res.status(HttpStatus.OK).json({ status: 'success', message: 'Webhook recibido' });
+    const brand =
+      colors.bgBlue(colors.white(colors.bold(' WhatHub '))) +
+      colors.bgGreen(colors.white(colors.bold(' GateWay ')));
+    console.log(
+      brand,
+      colors.green('Webhook recibido de Evolution:'),
+      colors.blue(JSON.stringify(body)),
+    );
+    return res
+      .status(HttpStatus.OK)
+      .json({ status: 'success', message: 'Webhook recibido' });
+  }
+
+  @Post('instance/create-basic')
+  async createBasicInstance(
+    @Body('number') number?: string,
+  ): Promise<{ status: string; message: string; data?: any }> {
+
+    try {
+      const result = await this.evolutionService.createBasicInstance(number);
+      return {
+        status: 'success',
+        message: 'Instancia básica creada exitosamente',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al crear instancia básica: ${error}`,
+      };
+    }
+  }
+
+ 
+  @Delete('instance/:instanceName')
+  async deleteInstance(
+    @Param('instanceName') instanceName: string,
+  ): Promise<{ status: string; message: string; data?: any }> {
+
+    try {
+      const result = await this.evolutionService.deleteInstance(instanceName);
+      return {
+        status: 'success',
+        message: 'Instancia eliminada exitosamente',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al eliminar instancia: ${error.message}`,
+      };
+    }
+  }
+
+  @Get('instances')
+  async getAllInstances(): Promise<{ status: string; message: string; data?: any }> {
+
+    try {
+      const result = await this.evolutionService.getAllInstances();
+      return {
+        status: 'success',
+        message: 'Lista de instancias obtenida exitosamente',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al obtener lista de instancias: ${error.message}`,
+      };
+    }
   }
 }

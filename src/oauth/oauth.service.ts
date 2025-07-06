@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
-
+import { UserService } from '../user/user.service';
+import { GhlAuth } from '../user/user.schema';
 import axios from 'axios';
 
 @Injectable()
 export class OauthService {
-  // Implementación interna de OAuth para /leadconnector/oauth
+  constructor(private readonly userService: UserService) {}
+
   async handleLeadConnectorOAuth(body: any): Promise<any> {
-    // Aquí va la lógica interna de OAuth.
-    // Por ahora, solo retornamos el body recibido como ejemplo.
-    // Reemplaza esto con la lógica real según los requerimientos de OAuth.
     return {
       message: 'OAuth logic not implemented yet. Replace with actual logic.',
       received: body,
@@ -28,7 +27,6 @@ export class OauthService {
     params.append('code', code);
     params.append('redirect_uri', redirect_uri);
     params.append('user_type', 'Location');
-    // No enviar scopes en la petición de token según la documentación de GHL
 
     try {
       const response = await axios.post(
@@ -36,29 +34,78 @@ export class OauthService {
         params,
         {
           headers: {
-            'Accept': 'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-        }
+        },
       );
-      return response.data;
+
+      const tokenData = response.data;
+
+      // Si hay locationId en el tokenData, actualizar el usuario correspondiente
+      if (tokenData.locationId) {
+        try {
+          const ghlAuth: GhlAuth = {
+            access_token: tokenData.access_token,
+            token_type: tokenData.token_type,
+            expires_in: tokenData.expires_in,
+            refresh_token: tokenData.refresh_token,
+            scope: tokenData.scope,
+            refreshTokenId: tokenData.refreshTokenId,
+            userType: tokenData.userType || 'Location',
+            companyId: tokenData.companyId,
+            locationId: tokenData.locationId,
+            isBulkInstallation: tokenData.isBulkInstallation,
+            userId: tokenData.userId,
+          };
+
+          await this.userService.updateGhlAuthByLocationId(
+            tokenData.locationId,
+            ghlAuth,
+          );
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const colors = require('colors');
+          const brand =
+            colors.bgBlue(colors.white(colors.bold(' WhatHub '))) +
+            colors.bgGreen(colors.white(colors.bold(' GateWay ')));
+          console.log(
+            brand,
+            colors.green(
+              `GHL Auth actualizado para usuario con locationId: ${tokenData.locationId}`,
+            ),
+          );
+        } catch (userError) {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const colors = require('colors');
+          const brand =
+            colors.bgBlue(colors.white(colors.bold(' WhatHub '))) +
+            colors.bgGreen(colors.white(colors.bold(' GateWay ')));
+          console.warn(
+            brand,
+            colors.yellow(
+              `No se pudo actualizar el usuario con locationId ${tokenData.locationId}:`,
+              userError.message,
+            ),
+          );
+        }
+      }
+
+      return tokenData;
     } catch (error) {
-      // Log detallado para depuración con branding y color
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+
       const colors = require('colors');
-      const brand = colors.bgBlue(colors.white(colors.bold(' WhatHub '))) + colors.bgGreen(colors.white(colors.bold(' GateWay ')));
-      console.error(
-        brand,
-        colors.red('Error al solicitar token a GHL:'),
-        {
-          sent_params: Object.fromEntries(params.entries()),
-          response_data: error.response?.data,
-          status: error.response?.status,
-          message: error.message,
-        }
-      );
+      const brand =
+        colors.bgBlue(colors.white(colors.bold(' WhatHub '))) +
+        colors.bgGreen(colors.white(colors.bold(' GateWay ')));
+      console.error(brand, colors.red('Error al solicitar token a GHL:'), {
+        sent_params: Object.fromEntries(params.entries()),
+        response_data: error.response?.data,
+        status: error.response?.status,
+        message: error.message,
+      });
       throw new Error(
-        `GHL Token Error: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`
+        `GHL Token Error: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`,
       );
     }
   }
