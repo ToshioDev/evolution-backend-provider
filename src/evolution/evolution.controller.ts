@@ -9,10 +9,14 @@ import {
   Param,
 } from '@nestjs/common';
 import { EvolutionService } from './evolution.service';
+import { UserService } from '../user/user.service';
 
 @Controller('evolution')
 export class EvolutionController {
-  constructor(private readonly evolutionService: EvolutionService) {}
+  constructor(
+    private readonly evolutionService: EvolutionService,
+    private readonly userService: UserService,
+  ) {}
 
   @Post('message')
   async sendMessage(
@@ -64,10 +68,11 @@ export class EvolutionController {
 
   @Post('instance/create-basic')
   async createBasicInstance(
+    @Body('userId') userId: string,
     @Body('number') number?: string,
   ): Promise<{ status: string; message: string; data?: any }> {
     try {
-      const result = await this.evolutionService.createBasicInstance(number);
+      const result = await this.evolutionService.createBasicInstance(userId, number);
       return {
         status: 'success',
         message: 'Instancia básica creada exitosamente',
@@ -86,7 +91,19 @@ export class EvolutionController {
     @Param('instanceName') instanceName: string,
   ): Promise<{ status: string; message: string; data?: any }> {
     try {
+      // Eliminar la instancia en evolutionService
       const result = await this.evolutionService.deleteInstance(instanceName);
+
+      // Buscar el usuario que tenga esta instancia en evolutionInstances
+      const user = await this.userService.findOneByEvolutionInstanceName(instanceName);
+      if (user) {
+        // Eliminar la instancia del arreglo evolutionInstances por nombre
+        user.evolutionInstances = (user.evolutionInstances || []).filter(
+          (inst: any) => inst.name !== instanceName,
+        );
+        await this.userService.update(user.id, { evolutionInstances: user.evolutionInstances });
+      }
+
       return {
         status: 'success',
         message: 'Instancia eliminada exitosamente',
@@ -117,6 +134,42 @@ export class EvolutionController {
       return {
         status: 'error',
         message: `Error al obtener lista de instancias: ${error.message}`,
+      };
+    }
+  }
+
+  @Get('instance/:instanceName')
+  async getInstanceInfo(
+    @Param('instanceName') instanceName: string,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      // Intentar obtener la instancia directamente si existe el método, si no, filtrar de getAllInstances
+      let instanceInfo = null;
+      if (typeof this.evolutionService.getInstanceInfo === 'function') {
+        instanceInfo = await this.evolutionService.getInstanceInfo(instanceName);
+      } else {
+        const all = await this.evolutionService.getAllInstances();
+        if (Array.isArray(all)) {
+          instanceInfo = all.find((inst: any) => inst.name === instanceName);
+        } else if (all && Array.isArray(all.data)) {
+          instanceInfo = all.data.find((inst: any) => inst.name === instanceName);
+        }
+      }
+      if (!instanceInfo) {
+        return {
+          status: 'error',
+          message: 'Instancia no encontrada',
+        };
+      }
+      return {
+        status: 'success',
+        message: 'Información de la instancia obtenida exitosamente',
+        data: instanceInfo,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al obtener información de la instancia: ${error.message}`,
       };
     }
   }

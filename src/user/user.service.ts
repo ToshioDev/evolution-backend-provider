@@ -9,6 +9,16 @@ import { OnModuleInit } from '@nestjs/common';
 export class UserService implements OnModuleInit {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
+  async updateUserEvolutionInstances(userId: string, instanceData: any): Promise<boolean> {
+    const result = await this.userModel.findByIdAndUpdate(
+      userId,
+      { $push: { evolutionInstances: instanceData } },
+      { new: true }
+    );
+
+    return !!result;
+  }
+
   async onModuleInit() {
     await this.userModel.createCollection();
     await this.userModel.syncIndexes();
@@ -91,5 +101,9 @@ export class UserService implements OnModuleInit {
     await this.userModel
       .findByIdAndUpdate(userId, { $unset: { userToken: 1 } })
       .exec();
+  }
+
+  async findOneByEvolutionInstanceName(instanceName: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ 'evolutionInstances.name': instanceName }).exec();
   }
 }

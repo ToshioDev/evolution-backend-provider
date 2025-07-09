@@ -50,8 +50,18 @@ export class UserController {
         username: user.username,
         email: user.email,
         locationId: user.locationId,
+        ghlAuth: user.ghlAuth,
         evolutionInstances: user.evolutionInstances,
       },
+    };
+  }
+
+  @Get('me/instances')
+  @UseGuards(AuthGuard)
+  async getUserEvolutionInstances(@CurrentUser() user: any) {
+    return {
+      status: 'success',
+      data: user.evolutionInstances,
     };
   }
 

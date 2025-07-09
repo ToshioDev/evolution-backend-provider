@@ -17,9 +17,13 @@ interface CreateInstanceData {
   syncFullHistory?: boolean;
 }
 
+import { UserService } from '../user/user.service';
+
 @Injectable()
 export class EvolutionService {
   private readonly baseUrl = process.env.EVOLUTION_API_URL || '';
+
+  constructor(private readonly userService: UserService) {}
 
   async sendAudio(audio: string): Promise<any> {
     const url = `${this.baseUrl}/message/sendWhatsAppAudio/Recepcion Alphanet`;
@@ -123,7 +127,7 @@ export class EvolutionService {
     }
   }
 
-  async createBasicInstance(number?: string): Promise<any> {
+  async createBasicInstance(userId: string, number?: string): Promise<any> {
     let instanceName: string;
     if (number) {
       const cleanNumber = number.replace(/\D/g, '');
@@ -152,6 +156,19 @@ export class EvolutionService {
       colors.blue('Generando instancia con nombre único:'),
       colors.cyan(instanceName),
     );
+
+    // Update user with new instance
+    const updateResult = await this.userService.updateUserEvolutionInstances(userId, {
+      id: instanceName,
+      name: instanceName,
+      connectionStatus: 'pending',
+      ownerJid: '',
+      token: '',
+    });
+
+    if (!updateResult) {
+      throw new Error('Failed to update user with new instance');
+    }
 
     return this.createInstance(basicData);
   }
