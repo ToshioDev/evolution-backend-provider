@@ -11,7 +11,7 @@ export class OauthController {
     if (!clientId) {
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ status: 'error', message: 'GHL_CLIENT_ID is not set in environment variables' });
     }
-    const redirectUri = 'http://localhost:3000/oauth/callback';
+    const redirectUri = process.env.GHL_REDIRECT_URI || '';
     const scope = process.env.GHL_SCOPES || '';
     const url = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}`;
     return res.redirect(url);
