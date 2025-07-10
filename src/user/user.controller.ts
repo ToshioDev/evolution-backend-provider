@@ -18,10 +18,14 @@ import {
   LocationId,
   UserData,
 } from '../auth/decorators/user.decorator';
+import { EvolutionService } from 'src/evolution/evolution.service';
 
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly evolutionService: EvolutionService,
+  ) {}
 
   @Post()
   async create(@Body() data: Partial<User>) {
@@ -59,10 +63,55 @@ export class UserController {
   @Get('me/instances')
   @UseGuards(AuthGuard)
   async getUserEvolutionInstances(@CurrentUser() user: any) {
-    return {
-      status: 'success',
-      data: user.evolutionInstances,
-    };
+    try {
+      const evolutionInstances = await this.evolutionService.getAllInstances();
+
+      if (evolutionInstances && evolutionInstances.length > 0) {
+        const userInstanceNames =
+          user.evolutionInstances?.map((inst) => inst.id || inst.name) || [];
+
+        const userEvolutionInstances = evolutionInstances
+          .filter((instance) =>
+            userInstanceNames.includes(instance.instanceName),
+          )
+          .map((instance) => ({
+            id: instance.instanceName,
+            name: instance.instanceName,
+            connectionStatus: instance.connectionStatus || 'disconnected',
+            ownerJid: instance.ownerJid || '',
+            token: instance.token || '',
+            evolutionId: instance.instanceName,
+            profileName: instance.profileName || null,
+            state: instance.state,
+          }));
+
+        if (userEvolutionInstances.length > 0) {
+          await this.evolutionService.updateEvolutionInstancesForUser(
+            user._id,
+            userEvolutionInstances,
+          );
+
+          return {
+            status: 'success',
+            data: userEvolutionInstances,
+            message: 'Instances synchronized successfully',
+          };
+        }
+      }
+
+      return {
+        status: 'success',
+        data: user.evolutionInstances || [],
+        message: 'No instances found in Evolution API',
+      };
+    } catch (error) {
+      console.error('Error synchronizing evolution instances:', error.message);
+      return {
+        status: 'success',
+        data: user.evolutionInstances || [],
+        message: 'Returned cached instances due to sync error',
+      };
+    }
   }
 
   @Get('me/location')
