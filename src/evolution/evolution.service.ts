@@ -25,12 +25,6 @@ export class EvolutionService {
 
   constructor(private readonly userService: UserService) {}
 
-  /**
-   * Permite al usuario autenticado actualizar el array completo de evolutionInstances.
-   * @param userId string
-   * @param instances Array<{ id, name, connectionStatus, ownerJid, token, evolutionId, profileName }>
-   * @returns Promise<boolean>
-   */
   async updateEvolutionInstancesForUser(
     userId: string,
     instances: Array<{
@@ -41,7 +35,7 @@ export class EvolutionService {
       token: string;
       evolutionId: string;
       profileName: string;
-    }>
+    }>,
   ): Promise<boolean> {
     return this.userService.setUserEvolutionInstances(userId, instances);
   }
@@ -179,13 +173,16 @@ export class EvolutionService {
     );
 
     // Update user with new instance
-    const updateResult = await this.userService.updateUserEvolutionInstances(userId, {
-      id: instanceName,
-      name: instanceName,
-      connectionStatus: 'pending',
-      ownerJid: '',
-      token: '',
-    });
+    const updateResult = await this.userService.updateUserEvolutionInstances(
+      userId,
+      {
+        id: instanceName,
+        name: instanceName,
+        connectionStatus: 'pending',
+        ownerJid: '',
+        token: '',
+      },
+    );
 
     if (!updateResult) {
       throw new Error('Failed to update user with new instance');
@@ -206,13 +203,11 @@ export class EvolutionService {
         },
       });
 
-      // La respuesta puede variar según el backend, pero asumimos que retorna la instancia o un array con una sola instancia
       const data = response.data;
       if (!data || (Array.isArray(data) && data.length === 0)) {
         throw new Error(`Instance ${instanceName} not found`);
       }
 
-      // Si es array, devolvemos el primer elemento, si es objeto, devolvemos el objeto
       if (Array.isArray(data)) {
         return data[0];
       }
@@ -346,6 +341,40 @@ export class EvolutionService {
         colors.yellow(error.message),
       );
       throw new Error(`Failed to get instance QR: ${error.message}`);
+    }
+  }
+
+  async getInstanceConnectionState(instanceName: string): Promise<any> {
+    const url = `${this.baseUrl}/instance/connectionState/${instanceName}`;
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          apikey: process.env.EVOLUTION_API_KEY || '',
+        },
+      });
+
+      const brand =
+        colors.bgBlue.white.bold(' WhatHub ') +
+        colors.bgGreen.white.bold(' GateWay ');
+      console.log(
+        brand,
+        colors.green('Estado de conexión obtenido:'),
+        colors.cyan(`${instanceName} - ${response.data.state || 'unknown'}`),
+      );
+
+      return response.data;
+    } catch (error) {
+      const brand =
+        colors.bgBlue.white.bold(' WhatHub ') +
+        colors.bgGreen.white.bold(' GateWay ');
+      console.error(
+        brand,
+        colors.red('Error al obtener estado de conexión:'),
+        colors.yellow(error.message),
+      );
+      throw new Error(
+        `Failed to get instance connection state: ${error.message}`,
+      );
     }
   }
 }

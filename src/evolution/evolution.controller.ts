@@ -25,7 +25,10 @@ export class EvolutionController {
     @Query('number') number: string,
   ): Promise<any> {
     try {
-      const qr = await this.evolutionService.getInstanceQr(instanceName, number);
+      const qr = await this.evolutionService.getInstanceQr(
+        instanceName,
+        number,
+      );
       return {
         status: 'success',
         message: 'QR obtenido exitosamente',
@@ -93,7 +96,10 @@ export class EvolutionController {
     @Body('number') number?: string,
   ): Promise<{ status: string; message: string; data?: any }> {
     try {
-      const result = await this.evolutionService.createBasicInstance(userId, number);
+      const result = await this.evolutionService.createBasicInstance(
+        userId,
+        number,
+      );
       return {
         status: 'success',
         message: 'Instancia básica creada exitosamente',
@@ -116,13 +122,16 @@ export class EvolutionController {
       const result = await this.evolutionService.deleteInstance(instanceName);
 
       // Buscar el usuario que tenga esta instancia en evolutionInstances
-      const user = await this.userService.findOneByEvolutionInstanceName(instanceName);
+      const user =
+        await this.userService.findOneByEvolutionInstanceName(instanceName);
       if (user) {
         // Eliminar la instancia del arreglo evolutionInstances por nombre
         user.evolutionInstances = (user.evolutionInstances || []).filter(
           (inst: any) => inst.name !== instanceName,
         );
-        await this.userService.update(user.id, { evolutionInstances: user.evolutionInstances });
+        await this.userService.update(user.id, {
+          evolutionInstances: user.evolutionInstances,
+        });
       }
 
       return {
@@ -164,7 +173,8 @@ export class EvolutionController {
     @Param('instanceName') instanceName: string,
   ): Promise<{ status: string; message: string; data?: any }> {
     try {
-      const instanceInfo = await this.evolutionService.getInstanceByName(instanceName);
+      const instanceInfo =
+        await this.evolutionService.getInstanceByName(instanceName);
       if (!instanceInfo) {
         return {
           status: 'error',
@@ -180,6 +190,26 @@ export class EvolutionController {
       return {
         status: 'error',
         message: `Error al obtener información de la instancia: ${error.message}`,
+      };
+    }
+  }
+
+  @Get('getStatus/:instanceName')
+  async getInstanceConnectionStatus(
+    @Param('instanceName') instanceName: string,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const connectionState =
+        await this.evolutionService.getInstanceConnectionState(instanceName);
+      return {
+        status: 'success',
+        message: 'Estado de conexión obtenido exitosamente',
+        data: connectionState,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al obtener estado de conexión: ${error.message}`,
       };
     }
   }
