@@ -12,31 +12,27 @@ export class MessageController {
   constructor(private readonly messageService: MessageService) {}
 
   @Post()
-  async create(@Body() body: { data: any }) {
+  async create(@Body() createMessageDto: any) {
     try {
-        
-      const dataToSave = {
-        userId: body.data.userId || null,
-        attachments: body.data.attachments || [],
-        contactId: body.data.contactId || null,
-        locationId: body.data.locationId || null,
-        messageId: body.data.messageId || null,
-        type: body.data.type || null,
-        conversationId: body.data.conversationId || null,
-        phone: body.data.phone || null,
-        message: body.data.message || null,
-        originalData: body.data, 
-        timestamp: new Date().toISOString(),
-      };
+      console.log('Datos recibidos en el POST:', createMessageDto);
 
-      const message = await this.messageService.create({
-        data: dataToSave,
-        receivedData: body.data,
-      });
+      const message = await this.messageService.create(createMessageDto);
 
       return {
-        data: dataToSave,
+        status: 'success',
+        data: {
+          userId: createMessageDto.userId,
+          attachments: createMessageDto.attachments,
+          contactId: createMessageDto.contactId,
+          locationId: createMessageDto.locationId,
+          messageId: createMessageDto.messageId,
+          type: createMessageDto.type,
+          conversationId: createMessageDto.conversationId,
+          phone: createMessageDto.phone,
+          message: createMessageDto.message,
+        },
         savedMessage: message,
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
