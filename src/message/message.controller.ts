@@ -21,41 +21,39 @@ export class MessageController {
   async create(@Body() createMessageDto: Partial<Message>) {
     try {
       const message = await this.messageService.create(createMessageDto);
+      const generatedMessageId = message.messageId.toString();
 
       const user = await this.userService.findByLocationId(
         createMessageDto.locationId || '1',
       );
 
-      if (
-        user &&
-        user.ghlAuth &&
-        user.ghlAuth.access_token &&
-        createMessageDto.messageId
-      ) {
-        try {
-          await axios({
-            method: 'PUT',
-            url: `https://services.leadconnectorhq.com/conversations/messages/${message.messageId}/status`,
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-              Version: '2021-04-15',
-              Authorization: `Bearer ${user.ghlAuth.access_token}`,
-            },
-            data: {
-              status: 'delivered',
-            },
-          });
-        } catch (ghlError) {
-          console.error('Error actualizando status en GoHighLevel:', {
-            messageId: createMessageDto.messageId,
-            status: ghlError.response?.status,
-            statusText: ghlError.response?.statusText,
-            error: ghlError.response?.data || ghlError.message,
-            message: `https://services.leadconnectorhq.com/conversations/messages/${message.messageId}/status`,
-            timestamp: new Date().toISOString(),
-          });
-        }
+      if (user && user.ghlAuth && user.ghlAuth.access_token) {
+        setTimeout(async () => {
+          try {
+            await axios({
+              method: 'PUT',
+              url: `https://services.leadconnectorhq.com/conversations/messages/${generatedMessageId}/status`,
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                Version: '2021-04-15',
+                Authorization: `Bearer ${user.ghlAuth!.access_token}`,
+              },
+              data: {
+                status: 'delivered',
+              },
+            });
+          } catch (ghlError) {
+            console.error('Error actualizando status en GoHighLevel:', {
+              messageId: generatedMessageId,
+              status: ghlError.response?.status,
+              statusText: ghlError.response?.statusText,
+              error: ghlError.response?.data || ghlError.message,
+              url: `https://services.leadconnectorhq.com/conversations/messages/${generatedMessageId}/status`,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }, 3000); 
       }
 
       return {
@@ -65,7 +63,7 @@ export class MessageController {
           attachments: createMessageDto.attachments,
           contactId: createMessageDto.contactId,
           locationId: createMessageDto.locationId,
-          messageId: createMessageDto.messageId,
+          messageId: generatedMessageId, 
           type: createMessageDto.type,
           conversationId: createMessageDto.conversationId,
           phone: createMessageDto.phone,
