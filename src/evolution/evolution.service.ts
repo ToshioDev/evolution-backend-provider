@@ -189,14 +189,12 @@ export class EvolutionService {
 
     const createResult = await this.createInstance(basicData);
 
-    // Cooldown de 3 segundos después de crear la instancia
     console.log(
       brand,
       colors.yellow('Esperando 3 segundos antes de verificar la instancia...'),
     );
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // Verificar si la instancia creada tiene profileName null y reiniciar si es necesario
     try {
       const instanceData = await this.getInstanceByName(instanceName);
 
