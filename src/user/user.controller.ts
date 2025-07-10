@@ -64,19 +64,9 @@ export class UserController {
   @UseGuards(AuthGuard)
   async getUserEvolutionInstances(@CurrentUser() user: any) {
     try {
-      const brand =
-        '\x1b[44m\x1b[37m WhatHub \x1b[0m\x1b[42m\x1b[37m GateWay \x1b[0m';
-      console.log(
-        brand,
-        '\x1b[34mActualizando instancias para usuario:\x1b[0m',
-        user._id,
-      );
-
-      // Obtener todas las instancias de Evolution API
       const evolutionInstances = await this.evolutionService.getAllInstances();
 
       if (evolutionInstances && evolutionInstances.length > 0) {
-        // Obtener nombres/ids de instancias del usuario actual
         const userInstanceIdentifiers: string[] = [];
         if (user.evolutionInstances) {
           user.evolutionInstances.forEach((inst) => {
@@ -87,103 +77,91 @@ export class UserController {
           });
         }
 
-        console.log(
-          brand,
-          '\x1b[34mIdentificadores del usuario:\x1b[0m',
-          userInstanceIdentifiers,
-        );
-
-        // Filtrar instancias que pertenecen al usuario
         const userEvolutionInstances = evolutionInstances
           .filter((instance) => {
-            // Usar 'name' en lugar de 'instanceName'
             const instanceName = instance.name;
-            const found = userInstanceIdentifiers.includes(instanceName);
-
-            console.log(
-              brand,
-              `\x1b[34mVerificando instancia:\x1b[0m ${instanceName} - \x1b[${found ? '32' : '31'}m${found ? 'ENCONTRADA' : 'NO ENCONTRADA'}\x1b[0m`,
-            );
-
-            return found;
+            return userInstanceIdentifiers.includes(instanceName);
           })
           .map((instance) => ({
-            id: instance.name, // Usar 'name' como id
+            id: instance.name,
             name: instance.name,
             connectionStatus: instance.connectionStatus || 'disconnected',
             ownerJid: instance.ownerJid || '',
             token: instance.token || '',
-            evolutionId: instance.name, // Usar 'name' como evolutionId
+            evolutionId: instance.name,
             profileName: instance.profileName || null,
-            state: instance.connectionStatus || 'unknown', // Usar connectionStatus como state
-            // Agregar campos adicionales si los necesitas
+            state: instance.connectionStatus || 'unknown',
             profilePicUrl: instance.profilePicUrl || '',
             number: instance.number || '',
             businessId: instance.businessId || null,
           }));
 
-        console.log(
-          brand,
-          '\x1b[34mInstancias filtradas para actualizar:\x1b[0m',
-          userEvolutionInstances.length,
-        );
-
-        // Si hay instancias para actualizar
         if (userEvolutionInstances.length > 0) {
-          console.log(
-            brand,
-            '\x1b[34mDatos a actualizar:\x1b[0m',
-            JSON.stringify(userEvolutionInstances, null, 2),
-          );
+          // Verificar si hay cambios reales que requieran actualización
+          let needsUpdate = false;
 
-          const updateResult =
-            await this.userService.updateExistingEvolutionInstances(
-              user._id,
-              userEvolutionInstances,
+          userEvolutionInstances.forEach((newInstance) => {
+            const existingInstance = user.evolutionInstances?.find(
+              (existing) =>
+                existing.id === newInstance.id ||
+                existing.name === newInstance.name ||
+                existing.evolutionId === newInstance.evolutionId,
             );
 
-          console.log(
-            brand,
-            '\x1b[34mResultado de actualización:\x1b[0m',
-            updateResult,
-          );
+            if (!existingInstance) {
+              needsUpdate = true;
+              return;
+            }
 
-          if (updateResult) {
-            console.log(
-              brand,
-              '\x1b[32mInstancias actualizadas exitosamente:\x1b[0m',
-              userEvolutionInstances.length,
-            );
+            // Verificar si algún campo importante ha cambiado o está vacío
+            if (
+              !existingInstance.connectionStatus ||
+              !existingInstance.ownerJid ||
+              !existingInstance.token ||
+              !existingInstance.profileName ||
+              !existingInstance.profilePicUrl ||
+              existingInstance.connectionStatus !==
+                newInstance.connectionStatus ||
+              existingInstance.ownerJid !== newInstance.ownerJid ||
+              existingInstance.token !== newInstance.token ||
+              existingInstance.profileName !== newInstance.profileName ||
+              existingInstance.profilePicUrl !== newInstance.profilePicUrl ||
+              existingInstance.number !== newInstance.number
+            ) {
+              needsUpdate = true;
+            }
+          });
 
-            // Obtener el usuario actualizado para devolver los datos más recientes
-            const updatedUser = await this.userService.findById(user._id);
+          if (needsUpdate) {
+            const updateResult =
+              await this.userService.updateExistingEvolutionInstances(
+                user._id,
+                userEvolutionInstances,
+              );
 
-            console.log(
-              brand,
-              '\x1b[34mInstancias después de actualización:\x1b[0m',
-              JSON.stringify(updatedUser.evolutionInstances, null, 2),
-            );
+            if (updateResult) {
+              const updatedUser = await this.userService.findById(user._id);
 
-            return {
-              status: 'success',
-              data: updatedUser.evolutionInstances || [],
-              message: `${userEvolutionInstances.length} instances synchronized successfully`,
-              lastSync: new Date().toISOString(),
-            };
-          } else {
-            console.log(
-              brand,
-              '\x1b[31mError: No se pudo actualizar las instancias\x1b[0m',
-            );
+              return {
+                status: 'success',
+                data: updatedUser.evolutionInstances || [],
+                message: `${userEvolutionInstances.length} instances synchronized successfully`,
+                lastSync: new Date().toISOString(),
+                updated: true,
+              };
+            }
           }
+
+          // Si no hay cambios, devolver los datos existentes
+          return {
+            status: 'success',
+            data: user.evolutionInstances || [],
+            message: 'No updates needed - data is already current',
+            lastSync: new Date().toISOString(),
+            updated: false,
+          };
         }
       }
-
-      // Si no hay instancias nuevas o no se pudieron actualizar, devolver las existentes
-      console.log(
-        brand,
-        '\x1b[33mNo se encontraron instancias para actualizar, devolviendo cached:\x1b[0m',
-      );
 
       return {
         status: 'success',
@@ -192,8 +170,6 @@ export class UserController {
         lastSync: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('Error synchronizing evolution instances:', error.message);
-
       return {
         status: 'error',
         data: user.evolutionInstances || [],

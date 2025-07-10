@@ -19,35 +19,18 @@ export class UserService implements OnModuleInit {
       token: string;
       evolutionId: string;
       profileName: string;
+      profilePicUrl?: string;
       state?: string;
     }>,
   ): Promise<boolean> {
     try {
-      console.log(
-        '🔄 UserService: Iniciando actualización de instancias para usuario:',
-        userId,
-      );
-      console.log(
-        '📝 UserService: Instancias a actualizar:',
-        JSON.stringify(updatedInstances, null, 2),
-      );
-
-      // Obtener el usuario actual
       const user = await this.userModel.findById(userId);
       if (!user) {
-        console.log('❌ UserService: Usuario no encontrado');
         return false;
       }
 
-      console.log(
-        '👤 UserService: Usuario encontrado, instancias actuales:',
-        JSON.stringify(user.evolutionInstances, null, 2),
-      );
-
-      // Obtener instancias existentes del usuario
       const existingInstances = user.evolutionInstances || [];
 
-      // Crear un mapa de las instancias actualizadas para búsqueda rápida
       const updatedInstancesMap = new Map();
       updatedInstances.forEach((instance) => {
         updatedInstancesMap.set(instance.id, instance);
@@ -55,14 +38,7 @@ export class UserService implements OnModuleInit {
         updatedInstancesMap.set(instance.evolutionId, instance);
       });
 
-      console.log(
-        '🗺️ UserService: Mapa de instancias actualizadas creado con keys:',
-        Array.from(updatedInstancesMap.keys()),
-      );
-
-      // Actualizar instancias existentes y mantener las que no están en la actualización
       const mergedInstances = existingInstances.map((existingInstance) => {
-        // Convertir el documento de Mongoose a objeto plano
         const plainExistingInstance = JSON.parse(
           JSON.stringify(existingInstance),
         );
@@ -72,69 +48,28 @@ export class UserService implements OnModuleInit {
           plainExistingInstance.name ||
           plainExistingInstance.evolutionId;
 
-        console.log(
-          `🔍 UserService: Verificando instancia existente con key: ${instanceKey}`,
-        );
-
-        // Si encontramos una actualización para esta instancia
         if (updatedInstancesMap.has(instanceKey)) {
           const updatedInstance = updatedInstancesMap.get(instanceKey);
-          console.log(`✅ UserService: Actualizando instancia ${instanceKey}`);
-          console.log(
-            '📊 UserService: Datos antiguos:',
-            JSON.stringify(plainExistingInstance, null, 2),
-          );
-          console.log(
-            '📊 UserService: Datos nuevos:',
-            JSON.stringify(updatedInstance, null, 2),
-          );
 
-          // Crear el objeto mezclado con datos planos
           const merged = {
-            ...plainExistingInstance, // Mantener datos existentes (como objeto plano)
-            ...updatedInstance, // Sobrescribir con datos actualizados
+            ...plainExistingInstance,
+            ...updatedInstance,
           };
 
-          console.log(
-            '📊 UserService: Datos mezclados:',
-            JSON.stringify(merged, null, 2),
-          );
           return merged;
         }
 
-        console.log(
-          `➡️ UserService: Manteniendo instancia ${instanceKey} sin cambios`,
-        );
-        // Si no hay actualización, mantener la instancia original como objeto plano
         return plainExistingInstance;
       });
 
-      console.log(
-        '🔄 UserService: Instancias finales a guardar:',
-        JSON.stringify(mergedInstances, null, 2),
-      );
-
-      // Actualizar el usuario con las instancias mezcladas
       const result = await this.userModel.findByIdAndUpdate(
         userId,
         { evolutionInstances: mergedInstances },
         { new: true },
       );
 
-      console.log('💾 UserService: Resultado de la actualización:', !!result);
-      if (result) {
-        console.log(
-          '✅ UserService: Instancias guardadas exitosamente:',
-          JSON.stringify(result.evolutionInstances, null, 2),
-        );
-      }
-
       return !!result;
     } catch (error) {
-      console.error(
-        '❌ UserService: Error updating existing evolution instances:',
-        error,
-      );
       return false;
     }
   }
@@ -163,6 +98,7 @@ export class UserService implements OnModuleInit {
       token: string;
       evolutionId: string;
       profileName: string;
+      profilePicUrl?: string;
     }>,
   ): Promise<boolean> {
     const result = await this.userModel.findByIdAndUpdate(
