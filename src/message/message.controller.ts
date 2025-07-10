@@ -45,9 +45,6 @@ export class MessageController {
             },
             data: {
               status: 'delivered',
-              error: null,
-              emailMessageId: createMessageDto.messageId,
-              recipients: [createMessageDto.phone || 'unknown'],
             },
           });
 
