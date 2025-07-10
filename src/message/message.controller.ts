@@ -34,7 +34,15 @@ export class MessageController {
         createMessageDto.messageId
       ) {
         try {
-          const ghlResponse = await axios({
+          console.log('=== DATOS PARA GHL REQUEST ===');
+          console.log('MessageId:', createMessageDto.messageId);
+          console.log('Token:', user.ghlAuth.access_token);
+          console.log(
+            'URL completa:',
+            `https://services.leadconnectorhq.com/conversations/messages/${createMessageDto.messageId}/status`,
+          );
+
+          const requestConfig = {
             method: 'PUT',
             url: `https://services.leadconnectorhq.com/conversations/messages/${createMessageDto.messageId}/status`,
             headers: {
@@ -46,19 +54,35 @@ export class MessageController {
             data: {
               status: 'delivered',
             },
-          });
+          };
 
-          console.log('Status actualizado en GHL:', ghlResponse.data);
+          console.log('=== REQUEST CONFIG ===');
+          console.log(JSON.stringify(requestConfig, null, 2));
+
+          const ghlResponse = await axios(requestConfig);
+
+          console.log('=== RESPUESTA GHL EXITOSA ===');
+          console.log('Status:', ghlResponse.status);
+          console.log('Data:', ghlResponse.data);
         } catch (ghlError) {
-          console.error(
-            'Error actualizando status en GHL:',
-            ghlError.response?.data || ghlError.message,
-          );
+          console.error('=== ERROR EN GHL REQUEST ===');
+          console.error('Status:', ghlError.response?.status);
+          console.error('Status Text:', ghlError.response?.statusText);
+          console.error('Response Data:', ghlError.response?.data);
+          console.error('Headers enviados:', ghlError.config?.headers);
+          console.error('URL:', ghlError.config?.url);
+          console.error('Message:', ghlError.message);
         }
       } else {
+        console.log('=== VERIFICACIÓN DE DATOS ===');
+        console.log('User encontrado:', !!user);
+        console.log('GhlAuth existe:', !!(user && user.ghlAuth));
         console.log(
-          'No se pudo obtener token GHL o messageId para actualizar status',
+          'Access token existe:',
+          !!(user && user.ghlAuth && user.ghlAuth.access_token),
         );
+        console.log('MessageId existe:', !!createMessageDto.messageId);
+        console.log('LocationId usado:', createMessageDto.locationId);
       }
 
       return {
