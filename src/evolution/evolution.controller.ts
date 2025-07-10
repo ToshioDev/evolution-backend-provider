@@ -8,7 +8,6 @@ import {
   Delete,
   Param,
   Query,
-  Put,
 } from '@nestjs/common';
 import { EvolutionService } from './evolution.service';
 import { UserService } from '../user/user.service';
@@ -194,27 +193,6 @@ export class EvolutionController {
       };
     }
   }
-
-  @Get('getStatus/:instanceName')
-  async getInstanceConnectionStatus(
-    @Param('instanceName') instanceName: string,
-  ): Promise<{ status: string; message: string; data?: any }> {
-    try {
-      const connectionState =
-        await this.evolutionService.getInstanceConnectionState(instanceName);
-      return {
-        status: 'success',
-        message: 'Estado de conexión obtenido exitosamente',
-        data: connectionState,
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: `Error al obtener estado de conexión: ${error.message}`,
-      };
-    }
-  }
-
   @Post('instance/restart/:instanceName')
   async restartInstance(
     @Param('instanceName') instanceName: string,

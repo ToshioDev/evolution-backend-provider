@@ -153,166 +153,6 @@ export class EvolutionService {
       instanceName = `wh_${randomId}`;
     }
 
-    const brand =
-      colors.bgBlue.white.bold(' WhatHub ') +
-      colors.bgGreen.white.bold(' GateWay ');
-
-    // Verificar si la instancia ya existe
-    let existingInstance = null;
-    try {
-      existingInstance = await this.getInstanceByName(instanceName);
-      console.log(
-        brand,
-        colors.yellow('Instancia existente encontrada:'),
-        colors.cyan(instanceName),
-      );
-    } catch (error) {
-      console.log(
-        brand,
-        colors.blue('Instancia no existe, se creará:'),
-        colors.cyan(instanceName),
-      );
-    }
-
-    // Si la instancia existe, verificar si tiene datos de perfil
-    if (existingInstance) {
-      const instanceData = existingInstance as any;
-
-      // Log detallado de datos de perfil según la estructura de Evolution API
-      console.log(
-        brand,
-        colors.blue('Verificando datos de perfil de la instancia:'),
-        colors.cyan(instanceName),
-      );
-      console.log(
-        brand,
-        colors.gray('- Instance Name:'),
-        colors.white(instanceData.instanceName || 'No definido'),
-      );
-      console.log(
-        brand,
-        colors.gray('- Instance ID:'),
-        colors.white(instanceData.instanceId || 'No definido'),
-      );
-      console.log(
-        brand,
-        colors.gray('- Owner:'),
-        colors.white(instanceData.owner || 'No definido'),
-      );
-      console.log(
-        brand,
-        colors.gray('- Profile Name:'),
-        colors.white(instanceData.profileName || 'No definido'),
-      );
-      console.log(
-        brand,
-        colors.gray('- Profile Picture URL:'),
-        colors.white(instanceData.profilePictureUrl || 'No definido'),
-      );
-      console.log(
-        brand,
-        colors.gray('- Profile Status:'),
-        colors.white(instanceData.profileStatus || 'No definido'),
-      );
-      console.log(
-        brand,
-        colors.gray('- Connection Status:'),
-        colors.white(instanceData.status || 'No definido'),
-      );
-
-      // Validación de datos críticos para determinar si está completamente conectada
-      const hasCompleteProfileData =
-        instanceData.owner &&
-        instanceData.owner.trim() !== '' &&
-        instanceData.profileName &&
-        instanceData.profileName.trim() !== '' &&
-        instanceData.status === 'open';
-
-      const hasCriticalData =
-        instanceData.instanceId && instanceData.instanceId.trim() !== '';
-
-      if (!hasCompleteProfileData || !hasCriticalData) {
-        console.log(
-          brand,
-          colors.yellow(
-            '❌ Instancia sin datos de perfil completos, reiniciando:',
-          ),
-          colors.cyan(instanceName),
-        );
-
-        const missingFields: string[] = [];
-        if (!instanceData.owner || instanceData.owner.trim() === '') {
-          missingFields.push('owner');
-        }
-        if (
-          !instanceData.profileName ||
-          instanceData.profileName.trim() === ''
-        ) {
-          missingFields.push('profileName');
-        }
-        if (instanceData.status !== 'open') {
-          missingFields.push(
-            `status (actual: ${instanceData.status || 'undefined'})`,
-          );
-        }
-        if (!instanceData.instanceId || instanceData.instanceId.trim() === '') {
-          missingFields.push('instanceId');
-        }
-
-        console.log(
-          brand,
-          colors.red('Motivos:'),
-          colors.yellow(
-            `Campos faltantes o vacíos: ${missingFields.join(', ')}`,
-          ),
-        );
-
-        try {
-          await this.restartInstance(instanceName);
-          console.log(
-            brand,
-            colors.green('✅ Instancia reiniciada exitosamente:'),
-            colors.cyan(instanceName),
-          );
-        } catch (restartError) {
-          console.log(
-            brand,
-            colors.red('❌ Error al reiniciar instancia, continuando:'),
-            colors.yellow((restartError as any).message),
-          );
-        }
-      } else {
-        console.log(
-          brand,
-          colors.green(
-            '✅ Instancia completamente conectada con todos los datos:',
-          ),
-          colors.cyan(
-            `${instanceName} - ${instanceData.profileName} (${instanceData.status})`,
-          ),
-        );
-      }
-
-      // Update user with existing instance info
-      const updateResult = await this.userService.updateUserEvolutionInstances(
-        userId,
-        {
-          id: instanceName,
-          name: instanceName,
-          connectionStatus: instanceData.status || 'unknown',
-          ownerJid: instanceData.owner || '',
-          token: instanceData.apikey || '',
-        },
-      );
-
-      if (!updateResult) {
-        throw new Error('Failed to update user with existing instance');
-      }
-
-      return existingInstance;
-    }
-
-    // Si la instancia no existe, crearla
     const basicData: CreateInstanceData = {
       instanceName,
       qrcode: true,
@@ -323,9 +163,12 @@ export class EvolutionService {
       basicData.number = number;
     }
 
+    const brand =
+      colors.bgBlue.white.bold(' WhatHub ') +
+      colors.bgGreen.white.bold(' GateWay ');
     console.log(
       brand,
-      colors.blue('Creando nueva instancia:'),
+      colors.blue('Generando instancia con nombre único:'),
       colors.cyan(instanceName),
     );
 
@@ -344,9 +187,52 @@ export class EvolutionService {
       throw new Error('Failed to update user with new instance');
     }
 
-    return this.createInstance(basicData);
-  }
+    const createResult = await this.createInstance(basicData);
 
+    // Cooldown de 3 segundos después de crear la instancia
+    console.log(
+      brand,
+      colors.yellow('Esperando 3 segundos antes de verificar la instancia...'),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Verificar si la instancia creada tiene profileName null y reiniciar si es necesario
+    try {
+      const instanceData = await this.getInstanceByName(instanceName);
+
+      if (!instanceData.profileName || instanceData.profileName === null) {
+        console.log(
+          brand,
+          colors.yellow(
+            'Instance con profileName null detectada, reiniciando:',
+          ),
+          colors.cyan(instanceName),
+        );
+
+        await this.restartInstance(instanceName);
+
+        console.log(
+          brand,
+          colors.green('Instancia reiniciada por profileName null:'),
+          colors.cyan(instanceName),
+        );
+      } else {
+        console.log(
+          brand,
+          colors.green('Instance con profileName válido:'),
+          colors.cyan(`${instanceName} - ${instanceData.profileName}`),
+        );
+      }
+    } catch (error) {
+      console.error(
+        brand,
+        colors.red('Error al verificar profileName de instancia:'),
+        colors.yellow(error.message),
+      );
+    }
+
+    return createResult;
+  }
   async getInstanceByName(instanceName: string): Promise<any> {
     const url = `${this.baseUrl}/instance/fetchInstances`;
     try {
@@ -364,22 +250,9 @@ export class EvolutionService {
         throw new Error(`Instance ${instanceName} not found`);
       }
 
-      // La API retorna un array de objetos con estructura { instance: {...} }
       if (Array.isArray(data)) {
-        const instanceObj = data.find(
-          (item) => item.instance?.instanceName === instanceName,
-        );
-        if (!instanceObj) {
-          throw new Error(`Instance ${instanceName} not found in response`);
-        }
-        return instanceObj.instance; // Retornamos solo el objeto instance
+        return data[0];
       }
-
-      // Si no es array, verificar si tiene la estructura correcta
-      if (data.instance) {
-        return data.instance;
-      }
-
       return data;
     } catch (error) {
       const brand =
@@ -476,103 +349,6 @@ export class EvolutionService {
         colors.green('Lista de instancias obtenida exitosamente'),
         colors.cyan(`Total: ${response.data.length} instancias`),
       );
-
-      // Validar y reiniciar instancias que no tengan datos de perfil completos
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        console.log(
-          brand,
-          colors.blue(
-            '🔍 Iniciando validación de datos de perfil para todas las instancias...',
-          ),
-        );
-
-        const promises = response.data.map(async (item: any) => {
-          if (item.instance) {
-            const instanceData = item.instance;
-            const instanceName = instanceData.instanceName;
-
-            console.log(
-              brand,
-              colors.gray(`📋 Validando instancia: ${instanceName}`),
-            );
-
-            // Validación de datos críticos
-            const hasCompleteProfileData =
-              instanceData.owner &&
-              instanceData.owner.trim() !== '' &&
-              instanceData.profileName &&
-              instanceData.profileName.trim() !== '' &&
-              instanceData.status === 'open';
-
-            const hasCriticalData =
-              instanceData.instanceId && instanceData.instanceId.trim() !== '';
-
-            if (!hasCompleteProfileData || !hasCriticalData) {
-              const missingFields: string[] = [];
-              if (!instanceData.owner || instanceData.owner.trim() === '') {
-                missingFields.push('owner');
-              }
-              if (
-                !instanceData.profileName ||
-                instanceData.profileName.trim() === ''
-              ) {
-                missingFields.push('profileName');
-              }
-              if (instanceData.status !== 'open') {
-                missingFields.push(
-                  `status (actual: ${instanceData.status || 'undefined'})`,
-                );
-              }
-              if (
-                !instanceData.instanceId ||
-                instanceData.instanceId.trim() === ''
-              ) {
-                missingFields.push('instanceId');
-              }
-
-              console.log(
-                brand,
-                colors.yellow(
-                  `❌ ${instanceName} - Datos incompletos, reiniciando...`,
-                ),
-              );
-              console.log(
-                brand,
-                colors.red(`   Campos faltantes: ${missingFields.join(', ')}`),
-              );
-
-              try {
-                await this.restartInstance(instanceName);
-                console.log(
-                  brand,
-                  colors.green(`✅ ${instanceName} - Reiniciado exitosamente`),
-                );
-              } catch (restartError) {
-                console.log(
-                  brand,
-                  colors.red(`❌ ${instanceName} - Error al reiniciar:`),
-                  colors.yellow((restartError as any).message),
-                );
-              }
-            } else {
-              console.log(
-                brand,
-                colors.green(
-                  `✅ ${instanceName} - Datos completos (${instanceData.profileName})`,
-                ),
-              );
-            }
-          }
-        });
-
-        // Ejecutar todas las validaciones en paralelo
-        await Promise.allSettled(promises);
-
-        console.log(
-          brand,
-          colors.blue('🔍 Validación de instancias completada'),
-        );
-      }
 
       return response.data;
     } catch (error) {
@@ -678,5 +454,14 @@ export class EvolutionService {
       );
       throw new Error(`Failed to restart instance: ${error.message}`);
     }
+  }
+  async getInstanceProfileName(instanceName: string): Promise<string> {
+    const instance = await this.getInstanceByName(instanceName);
+    if (!instance || !instance.profileName) {
+      throw new Error(
+        `Instance ${instanceName} not found or has no profileName`,
+      );
+    }
+    return instance.profileName;
   }
 }
