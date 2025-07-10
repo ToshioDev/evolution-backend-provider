@@ -467,6 +467,11 @@ export class EvolutionService {
         brand,
         colors.green('Estado de conexión obtenido:'),
         colors.cyan(`${instanceName} - ${response.data || 'unknown'}`),
+        colors.cyan(`${instanceName} - ${response.status || 'unknown'}`),
+        colors.cyan(`${instanceName} - ${response.statusText || 'unknown'}`),
+        colors.cyan(`${instanceName} - ${response.headers || 'unknown'}`),
+        colors.cyan(`${instanceName} - ${response.config || 'unknown'}`),
+        colors.cyan(`${instanceName} - ${response.request || 'unknown'}`),
       );
 
       return response.data;
