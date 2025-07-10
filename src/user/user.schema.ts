@@ -51,7 +51,8 @@ export class User {
         token: { type: String, required: true },
         evolutionId: { type: String, required: true },
         profileName: { type: String, required: true },
-        profilePicUrl: { type: String, default: true },
+        profilePicUrl: { type: String, default: null },
+        isPrimary: { type: Boolean, default: false },
       },
     ],
     default: [],
@@ -64,6 +65,8 @@ export class User {
     token: string;
     evolutionId: string;
     profileName: string;
+    isPrimary: boolean;
+    profilePicUrl: string | null;
   }>;
 }
 

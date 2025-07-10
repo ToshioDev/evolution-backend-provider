@@ -92,6 +92,7 @@ export class UserController {
             profileName: instance.profileName || null,
             state: instance.connectionStatus || 'unknown',
             profilePicUrl: instance.profilePicUrl || null,
+            isPrimary: false,
           }));
 
         if (userEvolutionInstances.length > 0) {
@@ -272,5 +273,51 @@ export class UserController {
   async delete(@Param('id') id: string) {
     await this.userService.delete(id);
     return { status: 'success', message: 'User deleted' };
+  }
+
+  @Put('me/instances/:instanceId/primary')
+  @UseGuards(AuthGuard)
+  async updateInstancePrimary(
+    @CurrentUser() user: any,
+    @Param('instanceId') instanceId: string,
+    @Body() body: { isPrimary: boolean },
+  ) {
+    try {
+      const { isPrimary } = body;
+
+      if (typeof isPrimary !== 'boolean') {
+        throw new HttpException(
+          'isPrimary must be a boolean value',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const updateResult = await this.userService.updateInstancePrimary(
+        user._id,
+        instanceId,
+        isPrimary,
+      );
+
+      if (!updateResult) {
+        throw new HttpException(
+          'Instance not found or update failed',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return {
+        status: 'success',
+        message: `Instance ${instanceId} primary status updated to ${isPrimary}`,
+        data: {
+          instanceId,
+          isPrimary,
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }

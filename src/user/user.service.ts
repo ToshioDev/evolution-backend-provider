@@ -21,6 +21,7 @@ export class UserService implements OnModuleInit {
       profileName: string;
       profilePicUrl: string | null;
       state?: string;
+      isPrimary: boolean;
     }>,
   ): Promise<boolean> {
     try {
@@ -99,6 +100,7 @@ export class UserService implements OnModuleInit {
       evolutionId: string;
       profileName: string;
       profilePicUrl: string | null;
+      isPrimary: boolean;
     }>,
   ): Promise<boolean> {
     const result = await this.userModel.findByIdAndUpdate(
@@ -199,5 +201,51 @@ export class UserService implements OnModuleInit {
     return this.userModel
       .findOne({ 'evolutionInstances.name': instanceName })
       .exec();
+  }
+
+  async updateInstancePrimary(
+    userId: string,
+    instanceId: string,
+    isPrimary: boolean,
+  ): Promise<boolean> {
+    try {
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        return false;
+      }
+
+      const evolutionInstances = user.evolutionInstances || [];
+
+      const instanceIndex = evolutionInstances.findIndex(
+        (instance) =>
+          instance.id === instanceId ||
+          instance.name === instanceId ||
+          instance.evolutionId === instanceId,
+      );
+
+      if (instanceIndex === -1) {
+        return false;
+      }
+
+      if (isPrimary) {
+        evolutionInstances.forEach((instance, index) => {
+          if (index !== instanceIndex) {
+            instance.isPrimary = false;
+          }
+        });
+      }
+
+      evolutionInstances[instanceIndex].isPrimary = isPrimary;
+
+      const result = await this.userModel.findByIdAndUpdate(
+        userId,
+        { evolutionInstances },
+        { new: true },
+      );
+
+      return !!result;
+    } catch (error) {
+      return false;
+    }
   }
 }
