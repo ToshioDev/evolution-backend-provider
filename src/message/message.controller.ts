@@ -1,11 +1,7 @@
 import {
   Controller,
-  Get,
   Post,
   Body,
-  Patch,
-  Param,
-  Delete,
   HttpStatus,
   HttpException,
 } from '@nestjs/common';
@@ -16,9 +12,16 @@ export class MessageController {
   constructor(private readonly messageService: MessageService) {}
 
   @Post()
-  async create(@Body() createMessageDto: any) {
+  async create(@Body() body: { data: any }) {
     try {
-      const message = await this.messageService.create(createMessageDto);
+      console.log('Datos recibidos en el POST:', body);
+      console.log('Contenido de data:', body.data);
+
+      const message = await this.messageService.create({
+        ...body.data,
+        receivedData: body.data, 
+      });
+
       return {
         status: 'success',
         message: 'Mensaje creado exitosamente',
