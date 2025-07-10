@@ -277,28 +277,17 @@ export class UserController {
 
   @Put('me/instances/:instanceId/primary')
   @UseGuards(AuthGuard)
-  async updateInstancePrimary(
+  async toggleInstancePrimary(
     @CurrentUser() user: any,
     @Param('instanceId') instanceId: string,
-    @Body() body: { isPrimary: boolean },
   ) {
     try {
-      const { isPrimary } = body;
-
-      if (typeof isPrimary !== 'boolean') {
-        throw new HttpException(
-          'isPrimary must be a boolean value',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      const updateResult = await this.userService.updateInstancePrimary(
+      const result = await this.userService.toggleInstancePrimary(
         user._id,
         instanceId,
-        isPrimary,
       );
 
-      if (!updateResult) {
+      if (!result.success) {
         throw new HttpException(
           'Instance not found or update failed',
           HttpStatus.NOT_FOUND,
@@ -307,10 +296,11 @@ export class UserController {
 
       return {
         status: 'success',
-        message: `Instance ${instanceId} primary status updated to ${isPrimary}`,
+        message: `Instance ${instanceId} primary status toggled to ${result.isPrimary}`,
         data: {
           instanceId,
-          isPrimary,
+          isPrimary: result.isPrimary,
+          previousState: !result.isPrimary,
         },
       };
     } catch (error) {

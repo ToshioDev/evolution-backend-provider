@@ -203,15 +203,14 @@ export class UserService implements OnModuleInit {
       .exec();
   }
 
-  async updateInstancePrimary(
+  async toggleInstancePrimary(
     userId: string,
     instanceId: string,
-    isPrimary: boolean,
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; isPrimary?: boolean }> {
     try {
       const user = await this.userModel.findById(userId);
       if (!user) {
-        return false;
+        return { success: false };
       }
 
       const evolutionInstances = user.evolutionInstances || [];
@@ -224,10 +223,13 @@ export class UserService implements OnModuleInit {
       );
 
       if (instanceIndex === -1) {
-        return false;
+        return { success: false };
       }
 
-      if (isPrimary) {
+      const currentState = evolutionInstances[instanceIndex].isPrimary || false;
+      const newState = !currentState;
+
+      if (newState) {
         evolutionInstances.forEach((instance, index) => {
           if (index !== instanceIndex) {
             instance.isPrimary = false;
@@ -235,7 +237,7 @@ export class UserService implements OnModuleInit {
         });
       }
 
-      evolutionInstances[instanceIndex].isPrimary = isPrimary;
+      evolutionInstances[instanceIndex].isPrimary = newState;
 
       const result = await this.userModel.findByIdAndUpdate(
         userId,
@@ -243,9 +245,12 @@ export class UserService implements OnModuleInit {
         { new: true },
       );
 
-      return !!result;
+      return {
+        success: !!result,
+        isPrimary: newState,
+      };
     } catch (error) {
-      return false;
+      return { success: false };
     }
   }
 }
