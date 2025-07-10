@@ -8,6 +8,7 @@ import {
   Delete,
   Param,
   Query,
+  Put,
 } from '@nestjs/common';
 import { EvolutionService } from './evolution.service';
 import { UserService } from '../user/user.service';
@@ -210,6 +211,25 @@ export class EvolutionController {
       return {
         status: 'error',
         message: `Error al obtener estado de conexión: ${error.message}`,
+      };
+    }
+  }
+
+  @Post('instance/restart/:instanceName')
+  async restartInstance(
+    @Param('instanceName') instanceName: string,
+  ): Promise<any> {
+    try {
+      const result = await this.evolutionService.restartInstance(instanceName);
+      return {
+        status: 'success',
+        message: 'Instancia reiniciada exitosamente',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al reiniciar instancia: ${error}`,
       };
     }
   }

@@ -377,4 +377,40 @@ export class EvolutionService {
       );
     }
   }
+
+  async restartInstance(instanceName: string): Promise<any> {
+    const url = `${this.baseUrl}/instance/restart/${instanceName}`;
+    try {
+      const response = await axios.post(
+        url,
+        {},
+        {
+          headers: {
+            apikey: process.env.EVOLUTION_API_KEY || '',
+          },
+        },
+      );
+
+      const brand =
+        colors.bgBlue.white.bold(' WhatHub ') +
+        colors.bgGreen.white.bold(' GateWay ');
+      console.log(
+        brand,
+        colors.green('Instancia reiniciada exitosamente:'),
+        colors.cyan(instanceName),
+      );
+
+      return response.data;
+    } catch (error) {
+      const brand =
+        colors.bgBlue.white.bold(' WhatHub ') +
+        colors.bgGreen.white.bold(' GateWay ');
+      console.error(
+        brand,
+        colors.red('Error al reiniciar instancia:'),
+        colors.yellow(error.message),
+      );
+      throw new Error(`Failed to restart instance: ${error.message}`);
+    }
+  }
 }
