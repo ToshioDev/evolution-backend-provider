@@ -49,6 +49,8 @@ export class User {
         connectionStatus: { type: String, required: true },
         ownerJid: { type: String, required: true },
         token: { type: String, required: true },
+        evolutionId: { type: String, required: true },
+        profileName: { type: String, required: true },
       },
     ],
     default: [],
@@ -59,6 +61,8 @@ export class User {
     connectionStatus: string;
     ownerJid: string;
     token: string;
+    evolutionId: string;
+    profileName: string;
   }>;
 }
 

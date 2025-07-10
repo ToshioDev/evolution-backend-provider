@@ -21,6 +21,32 @@ export class UserService implements OnModuleInit {
     return !!result;
   }
 
+  /**
+   * Reemplaza el array completo de evolutionInstances del usuario.
+   * @param userId string
+   * @param instances Array<{ id, name, connectionStatus, ownerJid, token }>
+   * @returns Promise<boolean>
+   */
+  async setUserEvolutionInstances(
+    userId: string,
+    instances: Array<{
+      id: string;
+      name: string;
+      connectionStatus: string;
+      ownerJid: string;
+      token: string;
+      evolutionId: string;
+      profileName: string;
+    }>
+  ): Promise<boolean> {
+    const result = await this.userModel.findByIdAndUpdate(
+      userId,
+      { evolutionInstances: instances },
+      { new: true }
+    );
+    return !!result;
+  }
+
   async onModuleInit() {
     await this.userModel.createCollection();
     await this.userModel.syncIndexes();

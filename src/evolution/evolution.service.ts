@@ -25,6 +25,27 @@ export class EvolutionService {
 
   constructor(private readonly userService: UserService) {}
 
+  /**
+   * Permite al usuario autenticado actualizar el array completo de evolutionInstances.
+   * @param userId string
+   * @param instances Array<{ id, name, connectionStatus, ownerJid, token, evolutionId, profileName }>
+   * @returns Promise<boolean>
+   */
+  async updateEvolutionInstancesForUser(
+    userId: string,
+    instances: Array<{
+      id: string;
+      name: string;
+      connectionStatus: string;
+      ownerJid: string;
+      token: string;
+      evolutionId: string;
+      profileName: string;
+    }>
+  ): Promise<boolean> {
+    return this.userService.setUserEvolutionInstances(userId, instances);
+  }
+
   async sendAudio(audio: string): Promise<any> {
     const url = `${this.baseUrl}/message/sendWhatsAppAudio/Recepcion Alphanet`;
     try {

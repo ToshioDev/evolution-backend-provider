@@ -7,6 +7,7 @@ import {
   Get,
   Delete,
   Param,
+  Query,
 } from '@nestjs/common';
 import { EvolutionService } from './evolution.service';
 import { UserService } from '../user/user.service';
@@ -20,8 +21,8 @@ export class EvolutionController {
 
   @Get('qr')
   async getInstanceQr(
-    @Body('instanceName') instanceName: string,
-    @Body('number') number: string,
+    @Query('instanceName') instanceName: string,
+    @Query('number') number: string,
   ): Promise<any> {
     try {
       const qr = await this.evolutionService.getInstanceQr(instanceName, number);
