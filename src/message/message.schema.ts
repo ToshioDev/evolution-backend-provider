@@ -11,7 +11,6 @@ export class Message {
   @Prop({ type: MongooseSchema.Types.Mixed })
   receivedData: any;
 
-  // Permitir cualquier campo adicional
   [key: string]: any;
 }
 

@@ -19,7 +19,7 @@ export class MessageController {
       const message = await this.messageService.create(createMessageDto);
 
       return {
-        status: 'success',
+        status: 200,
         data: {
           userId: createMessageDto.userId,
           attachments: createMessageDto.attachments,
