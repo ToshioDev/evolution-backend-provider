@@ -87,21 +87,46 @@ export class UserController {
           });
         }
 
+        console.log(
+          brand,
+          '\x1b[34mIdentificadores del usuario:\x1b[0m',
+          userInstanceIdentifiers,
+        );
+
         // Filtrar instancias que pertenecen al usuario
         const userEvolutionInstances = evolutionInstances
-          .filter((instance) =>
-            userInstanceIdentifiers.includes(instance.instanceName),
-          )
+          .filter((instance) => {
+            // Usar 'name' en lugar de 'instanceName'
+            const instanceName = instance.name;
+            const found = userInstanceIdentifiers.includes(instanceName);
+
+            console.log(
+              brand,
+              `\x1b[34mVerificando instancia:\x1b[0m ${instanceName} - \x1b[${found ? '32' : '31'}m${found ? 'ENCONTRADA' : 'NO ENCONTRADA'}\x1b[0m`,
+            );
+
+            return found;
+          })
           .map((instance) => ({
-            id: instance.instanceName,
-            name: instance.instanceName,
+            id: instance.name, // Usar 'name' como id
+            name: instance.name,
             connectionStatus: instance.connectionStatus || 'disconnected',
             ownerJid: instance.ownerJid || '',
             token: instance.token || '',
-            evolutionId: instance.instanceName,
+            evolutionId: instance.name, // Usar 'name' como evolutionId
             profileName: instance.profileName || null,
-            state: instance.state || 'unknown',
+            state: instance.connectionStatus || 'unknown', // Usar connectionStatus como state
+            // Agregar campos adicionales si los necesitas
+            profilePicUrl: instance.profilePicUrl || '',
+            number: instance.number || '',
+            businessId: instance.businessId || null,
           }));
+
+        console.log(
+          brand,
+          '\x1b[34mInstancias filtradas para actualizar:\x1b[0m',
+          userEvolutionInstances.length,
+        );
 
         // Si hay instancias para actualizar
         if (userEvolutionInstances.length > 0) {
@@ -118,6 +143,7 @@ export class UserController {
               userEvolutionInstances.length,
             );
 
+            // Obtener el usuario actualizado para devolver los datos más recientes
             const updatedUser = await this.userService.findById(user._id);
 
             return {
@@ -154,7 +180,7 @@ export class UserController {
       };
     }
   }
-  
+
   @Get('me/location')
   @UseGuards(AuthGuard)
   async getCurrentUserLocation(@LocationId() locationId: string) {
