@@ -301,4 +301,26 @@ export class EvolutionService {
       throw new Error(`Failed to get instances list: ${error.message}`);
     }
   }
+
+  async getInstanceQr(instanceName: string, number: string): Promise<any> {
+    const url = `${this.baseUrl}/instance/connect/${instanceName}?number=${encodeURIComponent(number)}`;
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          apikey: process.env.EVOLUTION_API_KEY || '',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const brand =
+        colors.bgBlue.white.bold(' WhatHub ') +
+        colors.bgGreen.white.bold(' GateWay ');
+      console.error(
+        brand,
+        colors.red('Error al obtener QR de instancia:'),
+        colors.yellow(error.message),
+      );
+      throw new Error(`Failed to get instance QR: ${error.message}`);
+    }
+  }
 }

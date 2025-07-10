@@ -18,6 +18,26 @@ export class EvolutionController {
     private readonly userService: UserService,
   ) {}
 
+  @Get('qr')
+  async getInstanceQr(
+    @Body('instanceName') instanceName: string,
+    @Body('number') number: string,
+  ): Promise<any> {
+    try {
+      const qr = await this.evolutionService.getInstanceQr(instanceName, number);
+      return {
+        status: 'success',
+        message: 'QR obtenido exitosamente',
+        data: qr,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al obtener QR: ${error.message}`,
+      };
+    }
+  }
+
   @Post('message')
   async sendMessage(
     @Body('conversationId') conversationId: string,
