@@ -211,6 +211,25 @@ export class EvolutionController {
       };
     }
   }
+  @Get('getStatus/:instanceName')
+  async getInstanceConnectionStatus(
+    @Param('instanceName') instanceName: string,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const connectionState =
+        await this.evolutionService.getInstanceConnectionState(instanceName);
+      return {
+        status: 'success',
+        message: 'Estado de conexión obtenido exitosamente',
+        data: connectionState,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al obtener estado de conexión: ${error.message}`,
+      };
+    }
+  }
   @Post('validate-profile/:instanceName')
   async validateAndRestartInstance(
     @Param('instanceName') instanceName: string,
@@ -218,3 +237,4 @@ export class EvolutionController {
     return this.evolutionService.validateAndRestartInstance(instanceName);
   }
 }
+2
