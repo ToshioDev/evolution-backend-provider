@@ -466,7 +466,7 @@ export class EvolutionService {
       console.log(
         brand,
         colors.green('Estado de conexión obtenido:'),
-        colors.cyan(`${instanceName} - ${response.data.state || 'unknown'}`),
+        colors.cyan(`${instanceName} - ${response.data || 'unknown'}`),
       );
 
       return response.data;
