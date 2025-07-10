@@ -40,6 +40,7 @@ export class MessageController {
             headers: {
               'Content-Type': 'application/json',
               Accept: 'application/json',
+              Version: '2021-04-15',
               Authorization: `Bearer ${user.ghlAuth.access_token}`,
             },
             data: {
