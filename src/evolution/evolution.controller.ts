@@ -211,4 +211,10 @@ export class EvolutionController {
       };
     }
   }
+  @Post('validate-profile/:instanceName')
+  async validateAndRestartInstance(
+    @Param('instanceName') instanceName: string,
+  ) {
+    return this.evolutionService.validateAndRestartInstance(instanceName);
+  }
 }

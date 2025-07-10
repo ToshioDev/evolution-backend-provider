@@ -172,6 +172,7 @@ export class EvolutionService {
       colors.cyan(instanceName),
     );
 
+    // Update user with new instance
     const updateResult = await this.userService.updateUserEvolutionInstances(
       userId,
       {
@@ -187,50 +188,9 @@ export class EvolutionService {
       throw new Error('Failed to update user with new instance');
     }
 
-    const createResult = await this.createInstance(basicData);
-
-    console.log(
-      brand,
-      colors.yellow('Esperando 3 segundos antes de verificar la instancia...'),
-    );
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    try {
-      const instanceData = await this.getInstanceByName(instanceName);
-
-      if (!instanceData.profileName || instanceData.profileName === null) {
-        console.log(
-          brand,
-          colors.yellow(
-            'Instance con profileName null detectada, reiniciando:',
-          ),
-          colors.cyan(instanceName),
-        );
-
-        await this.restartInstance(instanceName);
-
-        console.log(
-          brand,
-          colors.green('Instancia reiniciada por profileName null:'),
-          colors.cyan(instanceName),
-        );
-      } else {
-        console.log(
-          brand,
-          colors.green('Instance con profileName válido:'),
-          colors.cyan(`${instanceName} - ${instanceData.profileName}`),
-        );
-      }
-    } catch (error) {
-      console.error(
-        brand,
-        colors.red('Error al verificar profileName de instancia:'),
-        colors.yellow(error.message),
-      );
-    }
-
-    return createResult;
+    return this.createInstance(basicData);
   }
+
   async getInstanceByName(instanceName: string): Promise<any> {
     const url = `${this.baseUrl}/instance/fetchInstances`;
     try {
@@ -453,13 +413,99 @@ export class EvolutionService {
       throw new Error(`Failed to restart instance: ${error.message}`);
     }
   }
-  async getInstanceProfileName(instanceName: string): Promise<string> {
-    const instance = await this.getInstanceByName(instanceName);
-    if (!instance || !instance.profileName) {
-      throw new Error(
-        `Instance ${instanceName} not found or has no profileName`,
+
+  async validateAndRestartInstance(instanceName: string): Promise<any> {
+    const brand =
+      colors.bgBlue.white.bold(' WhatHub ') +
+      colors.bgGreen.white.bold(' GateWay ');
+
+    try {
+      console.log(
+        brand,
+        colors.blue('Iniciando validación de instancia:'),
+        colors.cyan(instanceName),
       );
+
+      // Obtener la instancia específica
+      const instance = await this.getInstanceByName(instanceName);
+
+      if (!instance) {
+        console.log(
+          brand,
+          colors.red('Instancia no encontrada:'),
+          colors.cyan(instanceName),
+        );
+        return {
+          message: `Instance ${instanceName} not found`,
+          instanceName,
+          restarted: false,
+        };
+      }
+
+      if (!instance.profileName || instance.profileName === null) {
+        console.log(
+          brand,
+          colors.yellow('Instancia con profileName null detectada:'),
+          colors.cyan(instanceName),
+        );
+
+        try {
+          await this.restartInstance(instanceName);
+
+          console.log(
+            brand,
+            colors.green('Instancia reiniciada exitosamente:'),
+            colors.cyan(instanceName),
+          );
+
+          return {
+            message: `Instance ${instanceName} restarted successfully`,
+            instanceName,
+            restarted: true,
+            reason: 'profileName was null',
+          };
+        } catch (restartError) {
+          console.error(
+            brand,
+            colors.red(`Error al reiniciar instancia ${instanceName}:`),
+            colors.yellow(restartError.message),
+          );
+
+          return {
+            message: `Failed to restart instance ${instanceName}`,
+            instanceName,
+            restarted: false,
+            error: restartError.message,
+          };
+        }
+      } else {
+        console.log(
+          brand,
+          colors.green('Instancia con profileName válido:'),
+          colors.cyan(`${instanceName} - ${instance.profileName}`),
+        );
+
+        return {
+          message: `Instance ${instanceName} has valid profileName`,
+          instanceName,
+          restarted: false,
+          profileName: instance.profileName,
+          reason: 'profileName is valid',
+        };
+      }
+    } catch (error) {
+      console.error(
+        brand,
+        colors.red('Error durante la validación de instancia:'),
+        colors.yellow(error.message),
+      );
+
+      return {
+        message: `Failed to validate instance ${instanceName}`,
+        instanceName,
+        restarted: false,
+        error: error.message,
+      };
     }
-    return instance.profileName;
   }
 }
