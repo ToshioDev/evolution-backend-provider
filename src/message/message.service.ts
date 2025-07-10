@@ -9,8 +9,8 @@ export class MessageService {
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
   ) {}
 
-  async create(data: any): Promise<Message> {
-    const message = new this.messageModel(data);
-    return await message.save();
+  async create(data: Partial<Message>): Promise<Message> {
+    const created = new this.messageModel(data);
+    return created.save();
   }
 }
