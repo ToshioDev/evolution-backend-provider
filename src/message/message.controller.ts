@@ -35,7 +35,7 @@ export class MessageController {
         try {
           await axios({
             method: 'PUT',
-            url: `https://services.leadconnectorhq.com/conversations/messages/${createMessageDto.messageId}/status`,
+            url: `https://services.leadconnectorhq.com/conversations/messages/${message.messageId}/status`,
             headers: {
               'Content-Type': 'application/json',
               Accept: 'application/json',
@@ -52,6 +52,7 @@ export class MessageController {
             status: ghlError.response?.status,
             statusText: ghlError.response?.statusText,
             error: ghlError.response?.data || ghlError.message,
+            message: `https://services.leadconnectorhq.com/conversations/messages/${message.messageId}/status`,
             timestamp: new Date().toISOString(),
           });
         }
