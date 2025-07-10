@@ -25,21 +25,7 @@ export class EvolutionService {
 
   constructor(private readonly userService: UserService) {}
 
-  async updateExistingEvolutionInstancesForUser(
-    userId: string,
-    instances: Array<{
-      id: string;
-      name: string;
-      connectionStatus: string;
-      ownerJid: string;
-      token: string;
-      evolutionId: string;
-      profileName: string;
-      state?: string;
-    }>,
-  ): Promise<boolean> {
-    return this.userService.updateExistingEvolutionInstances(userId, instances);
-  }
+
 
   async sendAudio(audio: string): Promise<any> {
     const url = `${this.baseUrl}/message/sendWhatsAppAudio/Recepcion Alphanet`;

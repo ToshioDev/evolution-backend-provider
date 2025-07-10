@@ -51,6 +51,7 @@ export class User {
         token: { type: String, required: true },
         evolutionId: { type: String, required: true },
         profileName: { type: String, required: true },
+        profilePicUrl: { type: String, default: true },
       },
     ],
     default: [],

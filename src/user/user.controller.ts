@@ -91,13 +91,10 @@ export class UserController {
             evolutionId: instance.name,
             profileName: instance.profileName || null,
             state: instance.connectionStatus || 'unknown',
-            profilePicUrl: instance.profilePicUrl || '',
-            number: instance.number || '',
-            businessId: instance.businessId || null,
+            profilePicUrl: instance.profilePicUrl || null,
           }));
 
         if (userEvolutionInstances.length > 0) {
-          // Verificar si hay cambios reales que requieran actualización
           let needsUpdate = false;
 
           userEvolutionInstances.forEach((newInstance) => {
@@ -113,7 +110,6 @@ export class UserController {
               return;
             }
 
-            // Verificar si algún campo importante ha cambiado o está vacío
             if (
               !existingInstance.connectionStatus ||
               !existingInstance.ownerJid ||

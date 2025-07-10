@@ -19,7 +19,7 @@ export class UserService implements OnModuleInit {
       token: string;
       evolutionId: string;
       profileName: string;
-      profilePicUrl?: string;
+      profilePicUrl: string | null;
       state?: string;
     }>,
   ): Promise<boolean> {
@@ -98,7 +98,7 @@ export class UserService implements OnModuleInit {
       token: string;
       evolutionId: string;
       profileName: string;
-      profilePicUrl?: string;
+      profilePicUrl: string | null;
     }>,
   ): Promise<boolean> {
     const result = await this.userModel.findByIdAndUpdate(
