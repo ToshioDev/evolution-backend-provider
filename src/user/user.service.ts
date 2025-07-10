@@ -62,10 +62,15 @@ export class UserService implements OnModuleInit {
 
       // Actualizar instancias existentes y mantener las que no están en la actualización
       const mergedInstances = existingInstances.map((existingInstance) => {
+        // Convertir el documento de Mongoose a objeto plano
+        const plainExistingInstance = JSON.parse(
+          JSON.stringify(existingInstance),
+        );
+
         const instanceKey =
-          existingInstance.id ||
-          existingInstance.name ||
-          existingInstance.evolutionId;
+          plainExistingInstance.id ||
+          plainExistingInstance.name ||
+          plainExistingInstance.evolutionId;
 
         console.log(
           `🔍 UserService: Verificando instancia existente con key: ${instanceKey}`,
@@ -77,15 +82,16 @@ export class UserService implements OnModuleInit {
           console.log(`✅ UserService: Actualizando instancia ${instanceKey}`);
           console.log(
             '📊 UserService: Datos antiguos:',
-            JSON.stringify(existingInstance, null, 2),
+            JSON.stringify(plainExistingInstance, null, 2),
           );
           console.log(
             '📊 UserService: Datos nuevos:',
             JSON.stringify(updatedInstance, null, 2),
           );
 
+          // Crear el objeto mezclado con datos planos
           const merged = {
-            ...existingInstance, // Mantener datos existentes
+            ...plainExistingInstance, // Mantener datos existentes (como objeto plano)
             ...updatedInstance, // Sobrescribir con datos actualizados
           };
 
@@ -99,8 +105,8 @@ export class UserService implements OnModuleInit {
         console.log(
           `➡️ UserService: Manteniendo instancia ${instanceKey} sin cambios`,
         );
-        // Si no hay actualización, mantener la instancia original
-        return existingInstance;
+        // Si no hay actualización, mantener la instancia original como objeto plano
+        return plainExistingInstance;
       });
 
       console.log(
