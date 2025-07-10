@@ -153,6 +153,82 @@ export class EvolutionService {
       instanceName = `wh_${randomId}`;
     }
 
+    const brand =
+      colors.bgBlue.white.bold(' WhatHub ') +
+      colors.bgGreen.white.bold(' GateWay ');
+
+    // Verificar si la instancia ya existe
+    let existingInstance = null;
+    try {
+      existingInstance = await this.getInstanceByName(instanceName);
+      console.log(
+        brand,
+        colors.yellow('Instancia existente encontrada:'),
+        colors.cyan(instanceName),
+      );
+    } catch (error) {
+      console.log(
+        brand,
+        colors.blue('Instancia no existe, se creará:'),
+        colors.cyan(instanceName),
+      );
+    }
+
+    // Si la instancia existe, verificar si tiene datos de perfil
+    if (existingInstance) {
+      const instanceData = existingInstance as any;
+      const hasProfileData =
+        instanceData.profileName &&
+        instanceData.profileName.trim() !== '';
+
+      if (!hasProfileData) {
+        console.log(
+          brand,
+          colors.yellow('Instancia sin datos de perfil, reiniciando:'),
+          colors.cyan(instanceName),
+        );
+        try {
+          await this.restartInstance(instanceName);
+          console.log(
+            brand,
+            colors.green('Instancia reiniciada exitosamente:'),
+            colors.cyan(instanceName),
+          );
+        } catch (restartError) {
+          console.log(
+            brand,
+            colors.red('Error al reiniciar instancia, continuando:'),
+            colors.yellow((restartError as any).message),
+          );
+        }
+      } else {
+        console.log(
+          brand,
+          colors.green('Instancia ya conectada con datos de perfil:'),
+          colors.cyan(`${instanceName} - ${instanceData.profileName}`),
+        );
+      }
+
+      // Update user with existing instance info
+      const updateResult = await this.userService.updateUserEvolutionInstances(
+        userId,
+        {
+          id: instanceName,
+          name: instanceName,
+          connectionStatus: instanceData.connectionStatus || 'unknown',
+          ownerJid: instanceData.ownerJid || '',
+          token: instanceData.token || '',
+        },
+      );
+
+      if (!updateResult) {
+        throw new Error('Failed to update user with existing instance');
+      }
+
+      return existingInstance;
+    }
+
+    // Si la instancia no existe, crearla
     const basicData: CreateInstanceData = {
       instanceName,
       qrcode: true,
@@ -163,12 +239,9 @@ export class EvolutionService {
       basicData.number = number;
     }
 
-    const brand =
-      colors.bgBlue.white.bold(' WhatHub ') +
-      colors.bgGreen.white.bold(' GateWay ');
     console.log(
       brand,
-      colors.blue('Generando instancia con nombre único:'),
+      colors.blue('Creando nueva instancia:'),
       colors.cyan(instanceName),
     );
 
