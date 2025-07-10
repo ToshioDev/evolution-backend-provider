@@ -64,15 +64,33 @@ export class UserController {
   @UseGuards(AuthGuard)
   async getUserEvolutionInstances(@CurrentUser() user: any) {
     try {
+      const brand =
+        '\x1b[44m\x1b[37m WhatHub \x1b[0m\x1b[42m\x1b[37m GateWay \x1b[0m';
+      console.log(
+        brand,
+        '\x1b[34mActualizando instancias para usuario:\x1b[0m',
+        user._id,
+      );
+
+      // Obtener todas las instancias de Evolution API
       const evolutionInstances = await this.evolutionService.getAllInstances();
 
       if (evolutionInstances && evolutionInstances.length > 0) {
-        const userInstanceNames =
-          user.evolutionInstances?.map((inst) => inst.id || inst.name) || [];
+        // Obtener nombres/ids de instancias del usuario actual
+        const userInstanceIdentifiers: string[] = [];
+        if (user.evolutionInstances) {
+          user.evolutionInstances.forEach((inst) => {
+            if (inst.id) userInstanceIdentifiers.push(inst.id);
+            if (inst.name) userInstanceIdentifiers.push(inst.name);
+            if (inst.evolutionId)
+              userInstanceIdentifiers.push(inst.evolutionId);
+          });
+        }
 
+        // Filtrar instancias que pertenecen al usuario
         const userEvolutionInstances = evolutionInstances
           .filter((instance) =>
-            userInstanceNames.includes(instance.instanceName),
+            userInstanceIdentifiers.includes(instance.instanceName),
           )
           .map((instance) => ({
             id: instance.instanceName,
@@ -82,38 +100,61 @@ export class UserController {
             token: instance.token || '',
             evolutionId: instance.instanceName,
             profileName: instance.profileName || null,
-            state: instance.state,
+            state: instance.state || 'unknown',
           }));
 
+        // Si hay instancias para actualizar
         if (userEvolutionInstances.length > 0) {
-          await this.evolutionService.updateEvolutionInstancesForUser(
-            user._id,
-            userEvolutionInstances,
-          );
+          const updateResult =
+            await this.evolutionService.updateExistingEvolutionInstancesForUser(
+              user._id,
+              userEvolutionInstances,
+            );
 
-          return {
-            status: 'success',
-            data: userEvolutionInstances,
-            message: 'Instances synchronized successfully',
-          };
+          if (updateResult) {
+            console.log(
+              brand,
+              '\x1b[32mInstancias actualizadas exitosamente:\x1b[0m',
+              userEvolutionInstances.length,
+            );
+
+            const updatedUser = await this.userService.findById(user._id);
+
+            return {
+              status: 'success',
+              data: updatedUser.evolutionInstances || [],
+              message: `${userEvolutionInstances.length} instances synchronized successfully`,
+              lastSync: new Date().toISOString(),
+            };
+          }
         }
       }
 
+      // Si no hay instancias nuevas o no se pudieron actualizar, devolver las existentes
+      console.log(
+        brand,
+        '\x1b[33mNo se encontraron instancias para actualizar, devolviendo cached:\x1b[0m',
+      );
+
       return {
         status: 'success',
         data: user.evolutionInstances || [],
-        message: 'No instances found in Evolution API',
+        message: 'No instances found in Evolution API or no updates needed',
+        lastSync: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Error synchronizing evolution instances:', error.message);
+
       return {
-        status: 'success',
+        status: 'error',
         data: user.evolutionInstances || [],
-        message: 'Returned cached instances due to sync error',
+        message: 'Error during synchronization, returned cached instances',
+        error: error.message,
+        lastSync: new Date().toISOString(),
       };
     }
   }
-
+  
   @Get('me/location')
   @UseGuards(AuthGuard)
   async getCurrentUserLocation(@LocationId() locationId: string) {

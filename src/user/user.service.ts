@@ -9,12 +9,80 @@ import { OnModuleInit } from '@nestjs/common';
 export class UserService implements OnModuleInit {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
-  async updateUserEvolutionInstances(userId: string, instanceData: any): Promise<boolean> {
+  async updateExistingEvolutionInstances(
+    userId: string,
+    updatedInstances: Array<{
+      id: string;
+      name: string;
+      connectionStatus: string;
+      ownerJid: string;
+      token: string;
+      evolutionId: string;
+      profileName: string;
+      state?: string;
+    }>,
+  ): Promise<boolean> {
+    try {
+      // Obtener el usuario actual
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        return false;
+      }
+
+      // Obtener instancias existentes del usuario
+      const existingInstances = user.evolutionInstances || [];
+
+      // Crear un mapa de las instancias actualizadas para búsqueda rápida
+      const updatedInstancesMap = new Map();
+      updatedInstances.forEach((instance) => {
+        updatedInstancesMap.set(instance.id, instance);
+        updatedInstancesMap.set(instance.name, instance);
+        updatedInstancesMap.set(instance.evolutionId, instance);
+      });
+
+      // Actualizar instancias existentes y mantener las que no están en la actualización
+      const mergedInstances = existingInstances.map((existingInstance) => {
+        const instanceKey =
+          existingInstance.id ||
+          existingInstance.name ||
+          existingInstance.evolutionId;
+
+        // Si encontramos una actualización para esta instancia
+        if (updatedInstancesMap.has(instanceKey)) {
+          const updatedInstance = updatedInstancesMap.get(instanceKey);
+          return {
+            ...existingInstance, // Mantener datos existentes
+            ...updatedInstance, // Sobrescribir con datos actualizados
+          };
+        }
+
+        // Si no hay actualización, mantener la instancia original
+        return existingInstance;
+      });
+
+      // Actualizar el usuario con las instancias mezcladas
+      const result = await this.userModel.findByIdAndUpdate(
+        userId,
+        { evolutionInstances: mergedInstances },
+        { new: true },
+      );
+
+      return !!result;
+    } catch (error) {
+      console.error('Error updating existing evolution instances:', error);
+      return false;
+    }
+  }
+  
+  async updateUserEvolutionInstances(
+    userId: string,
+    instanceData: any,
+  ): Promise<boolean> {
     instanceData.evolutionId = instanceData.id;
     const result = await this.userModel.findByIdAndUpdate(
       userId,
       { $push: { evolutionInstances: instanceData } },
-      { new: true }
+      { new: true },
     );
 
     return !!result;
@@ -30,12 +98,12 @@ export class UserService implements OnModuleInit {
       token: string;
       evolutionId: string;
       profileName: string;
-    }>
+    }>,
   ): Promise<boolean> {
     const result = await this.userModel.findByIdAndUpdate(
       userId,
       { evolutionInstances: instances },
-      { new: true }
+      { new: true },
     );
     return !!result;
   }
@@ -124,7 +192,11 @@ export class UserService implements OnModuleInit {
       .exec();
   }
 
-  async findOneByEvolutionInstanceName(instanceName: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ 'evolutionInstances.name': instanceName }).exec();
+  async findOneByEvolutionInstanceName(
+    instanceName: string,
+  ): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({ 'evolutionInstances.name': instanceName })
+      .exec();
   }
 }

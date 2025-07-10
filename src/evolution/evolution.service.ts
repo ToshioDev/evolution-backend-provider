@@ -25,7 +25,7 @@ export class EvolutionService {
 
   constructor(private readonly userService: UserService) {}
 
-  async updateEvolutionInstancesForUser(
+  async updateExistingEvolutionInstancesForUser(
     userId: string,
     instances: Array<{
       id: string;
@@ -35,9 +35,10 @@ export class EvolutionService {
       token: string;
       evolutionId: string;
       profileName: string;
+      state?: string;
     }>,
   ): Promise<boolean> {
-    return this.userService.setUserEvolutionInstances(userId, instances);
+    return this.userService.updateExistingEvolutionInstances(userId, instances);
   }
 
   async sendAudio(audio: string): Promise<any> {
