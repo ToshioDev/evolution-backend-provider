@@ -1,17 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+import { Document } from 'mongoose';
 
-export type MessageDocument = Message & Document;
+export type MessageDocument = Message &
+  Document & {
+    createdAt: Date;
+    updatedAt: Date;
+  };
 
-@Schema({ timestamps: true, strict: false })
+@Schema({ timestamps: true })
 export class Message {
-  @Prop()
-  locationId?: string;
-
-  @Prop({ type: MongooseSchema.Types.Mixed })
-  receivedData: any;
-
-  [key: string]: any;
+  @Prop({ required: true })
+  locationId: string;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
