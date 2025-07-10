@@ -173,25 +173,29 @@ export class EvolutionService {
     return this.createInstance(basicData);
   }
 
-  async getInstanceInfo(instanceName: string): Promise<any> {
+  async getInstanceByName(instanceName: string): Promise<any> {
     const url = `${this.baseUrl}/instance/fetchInstances`;
     try {
       const response = await axios.get(url, {
         headers: {
           apikey: process.env.EVOLUTION_API_KEY || '',
         },
+        params: {
+          instanceName,
+        },
       });
 
-      const instances = response.data;
-      const instance = instances.find(
-        (inst: any) => inst.instance?.instanceName === instanceName,
-      );
-
-      if (!instance) {
+      // La respuesta puede variar según el backend, pero asumimos que retorna la instancia o un array con una sola instancia
+      const data = response.data;
+      if (!data || (Array.isArray(data) && data.length === 0)) {
         throw new Error(`Instance ${instanceName} not found`);
       }
 
-      return instance;
+      // Si es array, devolvemos el primer elemento, si es objeto, devolvemos el objeto
+      if (Array.isArray(data)) {
+        return data[0];
+      }
+      return data;
     } catch (error) {
       const brand =
         colors.bgBlue.white.bold(' WhatHub ') +
@@ -201,7 +205,7 @@ export class EvolutionService {
         colors.red('Error al obtener información de instancia:'),
         colors.yellow(error.message),
       );
-      throw new Error(`Failed to get instance info: ${error.message}`);
+      throw new Error(`Failed to get instance by name: ${error.message}`);
     }
   }
 

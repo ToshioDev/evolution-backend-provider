@@ -163,18 +163,7 @@ export class EvolutionController {
     @Param('instanceName') instanceName: string,
   ): Promise<{ status: string; message: string; data?: any }> {
     try {
-      // Intentar obtener la instancia directamente si existe el método, si no, filtrar de getAllInstances
-      let instanceInfo = null;
-      if (typeof this.evolutionService.getInstanceInfo === 'function') {
-        instanceInfo = await this.evolutionService.getInstanceInfo(instanceName);
-      } else {
-        const all = await this.evolutionService.getAllInstances();
-        if (Array.isArray(all)) {
-          instanceInfo = all.find((inst: any) => inst.name === instanceName);
-        } else if (all && Array.isArray(all.data)) {
-          instanceInfo = all.data.find((inst: any) => inst.name === instanceName);
-        }
-      }
+      const instanceInfo = await this.evolutionService.getInstanceByName(instanceName);
       if (!instanceInfo) {
         return {
           status: 'error',

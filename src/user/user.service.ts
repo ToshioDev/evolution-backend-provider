@@ -10,6 +10,8 @@ export class UserService implements OnModuleInit {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
   async updateUserEvolutionInstances(userId: string, instanceData: any): Promise<boolean> {
+    // Asegura que evolutionId siempre esté presente y sea igual al id de la instancia
+    instanceData.evolutionId = instanceData.id;
     const result = await this.userModel.findByIdAndUpdate(
       userId,
       { $push: { evolutionInstances: instanceData } },
