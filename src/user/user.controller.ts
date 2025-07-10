@@ -130,11 +130,23 @@ export class UserController {
 
         // Si hay instancias para actualizar
         if (userEvolutionInstances.length > 0) {
+          console.log(
+            brand,
+            '\x1b[34mDatos a actualizar:\x1b[0m',
+            JSON.stringify(userEvolutionInstances, null, 2),
+          );
+
           const updateResult =
-            await this.evolutionService.updateExistingEvolutionInstancesForUser(
+            await this.userService.updateExistingEvolutionInstances(
               user._id,
               userEvolutionInstances,
             );
+
+          console.log(
+            brand,
+            '\x1b[34mResultado de actualización:\x1b[0m',
+            updateResult,
+          );
 
           if (updateResult) {
             console.log(
@@ -146,12 +158,23 @@ export class UserController {
             // Obtener el usuario actualizado para devolver los datos más recientes
             const updatedUser = await this.userService.findById(user._id);
 
+            console.log(
+              brand,
+              '\x1b[34mInstancias después de actualización:\x1b[0m',
+              JSON.stringify(updatedUser.evolutionInstances, null, 2),
+            );
+
             return {
               status: 'success',
               data: updatedUser.evolutionInstances || [],
               message: `${userEvolutionInstances.length} instances synchronized successfully`,
               lastSync: new Date().toISOString(),
             };
+          } else {
+            console.log(
+              brand,
+              '\x1b[31mError: No se pudo actualizar las instancias\x1b[0m',
+            );
           }
         }
       }
