@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { MessageService } from './message.service';
 import { UserService } from '../user/user.service';
-import axios from 'axios';
 
 @Controller('message')
 export class MessageController {
@@ -51,27 +50,55 @@ export class MessageController {
               Version: '2021-04-15',
               Authorization: `Bearer ${user.ghlAuth.access_token}`,
             },
-            data: {
+            body: JSON.stringify({
               status: 'delivered',
-            },
+            }),
           };
 
           console.log('=== REQUEST CONFIG ===');
           console.log(JSON.stringify(requestConfig, null, 2));
 
-          const ghlResponse = await axios(requestConfig);
+          const ghlResponse = await fetch(requestConfig.url, {
+            method: requestConfig.method,
+            headers: requestConfig.headers,
+            body: requestConfig.body,
+          });
 
-          console.log('=== RESPUESTA GHL EXITOSA ===');
+          console.log('=== RESPUESTA GHL ===');
           console.log('Status:', ghlResponse.status);
-          console.log('Data:', ghlResponse.data);
+          console.log('Status Text:', ghlResponse.statusText);
+
+          if (ghlResponse.ok) {
+            const responseData = await ghlResponse.json();
+            console.log('=== RESPUESTA GHL EXITOSA ===');
+            console.log('Data:', responseData);
+          } else {
+            const errorData = await ghlResponse.json();
+            throw new Error(
+              `HTTP ${ghlResponse.status}: ${JSON.stringify(errorData)}`,
+            );
+          }
         } catch (ghlError) {
           console.error('=== ERROR EN GHL REQUEST ===');
-          console.error('Status:', ghlError.response?.status);
-          console.error('Status Text:', ghlError.response?.statusText);
-          console.error('Response Data:', ghlError.response?.data);
-          console.error('Headers enviados:', ghlError.config?.headers);
-          console.error('URL:', ghlError.config?.url);
-          console.error('Message:', ghlError.message);
+          console.error('Error completo:', ghlError);
+
+          if (ghlError.message && ghlError.message.includes('HTTP')) {
+            console.error('Error HTTP:', ghlError.message);
+
+            if (
+              ghlError.message.includes('403') &&
+              ghlError.message.includes('No conversation provider found')
+            ) {
+              console.log(
+                '⚠️  ADVERTENCIA: GoHighLevel no tiene configurado un proveedor de conversación para este mensaje',
+              );
+              console.log(
+                '📝 SUGERENCIA: Verifica la configuración de proveedores SMS/WhatsApp en tu cuenta de GHL',
+              );
+            }
+          } else {
+            console.error('Error de red o conexión:', ghlError.message);
+          }
         }
       } else {
         console.log('=== VERIFICACIÓN DE DATOS ===');
