@@ -177,34 +177,69 @@ export class EvolutionService {
     // Si la instancia existe, verificar si tiene datos de perfil
     if (existingInstance) {
       const instanceData = existingInstance as any;
+
+      // Log detallado de datos de perfil
+      console.log(
+        brand,
+        colors.blue('Verificando datos de perfil de la instancia:'),
+        colors.cyan(instanceName),
+      );
+      console.log(
+        brand,
+        colors.gray('- Profile Name:'),
+        colors.white(instanceData.profileName || 'No definido'),
+      );
+      console.log(
+        brand,
+        colors.gray('- Profile Picture URL:'),
+        colors.white(instanceData.profilePictureUrl || 'No definido'),
+      );
+      console.log(
+        brand,
+        colors.gray('- Owner JID:'),
+        colors.white(instanceData.ownerJid || 'No definido'),
+      );
+      console.log(
+        brand,
+        colors.gray('- Connection Status:'),
+        colors.white(instanceData.connectionStatus || 'No definido'),
+      );
+
       const hasProfileData =
-        instanceData.profileName &&
-        instanceData.profileName.trim() !== '';
+        instanceData.profileName && instanceData.profileName.trim() !== '';
 
       if (!hasProfileData) {
         console.log(
           brand,
-          colors.yellow('Instancia sin datos de perfil, reiniciando:'),
+          colors.yellow(
+            '❌ Instancia sin datos de perfil completos, reiniciando:',
+          ),
           colors.cyan(instanceName),
+        );
+        console.log(
+          brand,
+          colors.red('Motivo: profileName vacío o no definido'),
         );
         try {
           await this.restartInstance(instanceName);
           console.log(
             brand,
-            colors.green('Instancia reiniciada exitosamente:'),
+            colors.green('✅ Instancia reiniciada exitosamente:'),
             colors.cyan(instanceName),
           );
         } catch (restartError) {
           console.log(
             brand,
-            colors.red('Error al reiniciar instancia, continuando:'),
+            colors.red('❌ Error al reiniciar instancia, continuando:'),
             colors.yellow((restartError as any).message),
           );
         }
       } else {
         console.log(
           brand,
-          colors.green('Instancia ya conectada con datos de perfil:'),
+          colors.green(
+            '✅ Instancia ya conectada con datos de perfil completos:',
+          ),
           colors.cyan(`${instanceName} - ${instanceData.profileName}`),
         );
       }
@@ -245,7 +280,6 @@ export class EvolutionService {
       colors.cyan(instanceName),
     );
 
-    // Update user with new instance
     const updateResult = await this.userService.updateUserEvolutionInstances(
       userId,
       {
