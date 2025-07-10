@@ -178,11 +178,26 @@ export class EvolutionService {
     if (existingInstance) {
       const instanceData = existingInstance as any;
 
-      // Log detallado de datos de perfil
+      // Log detallado de datos de perfil según la estructura de Evolution API
       console.log(
         brand,
         colors.blue('Verificando datos de perfil de la instancia:'),
         colors.cyan(instanceName),
+      );
+      console.log(
+        brand,
+        colors.gray('- Instance Name:'),
+        colors.white(instanceData.instanceName || 'No definido'),
+      );
+      console.log(
+        brand,
+        colors.gray('- Instance ID:'),
+        colors.white(instanceData.instanceId || 'No definido'),
+      );
+      console.log(
+        brand,
+        colors.gray('- Owner:'),
+        colors.white(instanceData.owner || 'No definido'),
       );
       console.log(
         brand,
@@ -196,19 +211,27 @@ export class EvolutionService {
       );
       console.log(
         brand,
-        colors.gray('- Owner JID:'),
-        colors.white(instanceData.ownerJid || 'No definido'),
+        colors.gray('- Profile Status:'),
+        colors.white(instanceData.profileStatus || 'No definido'),
       );
       console.log(
         brand,
         colors.gray('- Connection Status:'),
-        colors.white(instanceData.connectionStatus || 'No definido'),
+        colors.white(instanceData.status || 'No definido'),
       );
 
-      const hasProfileData =
-        instanceData.profileName && instanceData.profileName.trim() !== '';
+      // Validación de datos críticos para determinar si está completamente conectada
+      const hasCompleteProfileData =
+        instanceData.owner &&
+        instanceData.owner.trim() !== '' &&
+        instanceData.profileName &&
+        instanceData.profileName.trim() !== '' &&
+        instanceData.status === 'open';
 
-      if (!hasProfileData) {
+      const hasCriticalData =
+        instanceData.instanceId && instanceData.instanceId.trim() !== '';
+
+      if (!hasCompleteProfileData || !hasCriticalData) {
         console.log(
           brand,
           colors.yellow(
@@ -216,10 +239,34 @@ export class EvolutionService {
           ),
           colors.cyan(instanceName),
         );
+
+        const missingFields: string[] = [];
+        if (!instanceData.owner || instanceData.owner.trim() === '') {
+          missingFields.push('owner');
+        }
+        if (
+          !instanceData.profileName ||
+          instanceData.profileName.trim() === ''
+        ) {
+          missingFields.push('profileName');
+        }
+        if (instanceData.status !== 'open') {
+          missingFields.push(
+            `status (actual: ${instanceData.status || 'undefined'})`,
+          );
+        }
+        if (!instanceData.instanceId || instanceData.instanceId.trim() === '') {
+          missingFields.push('instanceId');
+        }
+
         console.log(
           brand,
-          colors.red('Motivo: profileName vacío o no definido'),
+          colors.red('Motivos:'),
+          colors.yellow(
+            `Campos faltantes o vacíos: ${missingFields.join(', ')}`,
+          ),
         );
+
         try {
           await this.restartInstance(instanceName);
           console.log(
@@ -238,9 +285,11 @@ export class EvolutionService {
         console.log(
           brand,
           colors.green(
-            '✅ Instancia ya conectada con datos de perfil completos:',
+            '✅ Instancia completamente conectada con todos los datos:',
           ),
-          colors.cyan(`${instanceName} - ${instanceData.profileName}`),
+          colors.cyan(
+            `${instanceName} - ${instanceData.profileName} (${instanceData.status})`,
+          ),
         );
       }
 
@@ -250,9 +299,9 @@ export class EvolutionService {
         {
           id: instanceName,
           name: instanceName,
-          connectionStatus: instanceData.connectionStatus || 'unknown',
-          ownerJid: instanceData.ownerJid || '',
-          token: instanceData.token || '',
+          connectionStatus: instanceData.status || 'unknown',
+          ownerJid: instanceData.owner || '',
+          token: instanceData.apikey || '',
         },
       );
 
@@ -315,9 +364,22 @@ export class EvolutionService {
         throw new Error(`Instance ${instanceName} not found`);
       }
 
+      // La API retorna un array de objetos con estructura { instance: {...} }
       if (Array.isArray(data)) {
-        return data[0];
+        const instanceObj = data.find(
+          (item) => item.instance?.instanceName === instanceName,
+        );
+        if (!instanceObj) {
+          throw new Error(`Instance ${instanceName} not found in response`);
+        }
+        return instanceObj.instance; // Retornamos solo el objeto instance
       }
+
+      // Si no es array, verificar si tiene la estructura correcta
+      if (data.instance) {
+        return data.instance;
+      }
+
       return data;
     } catch (error) {
       const brand =
@@ -415,6 +477,103 @@ export class EvolutionService {
         colors.cyan(`Total: ${response.data.length} instancias`),
       );
 
+      // Validar y reiniciar instancias que no tengan datos de perfil completos
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        console.log(
+          brand,
+          colors.blue(
+            '🔍 Iniciando validación de datos de perfil para todas las instancias...',
+          ),
+        );
+
+        const promises = response.data.map(async (item: any) => {
+          if (item.instance) {
+            const instanceData = item.instance;
+            const instanceName = instanceData.instanceName;
+
+            console.log(
+              brand,
+              colors.gray(`📋 Validando instancia: ${instanceName}`),
+            );
+
+            // Validación de datos críticos
+            const hasCompleteProfileData =
+              instanceData.owner &&
+              instanceData.owner.trim() !== '' &&
+              instanceData.profileName &&
+              instanceData.profileName.trim() !== '' &&
+              instanceData.status === 'open';
+
+            const hasCriticalData =
+              instanceData.instanceId && instanceData.instanceId.trim() !== '';
+
+            if (!hasCompleteProfileData || !hasCriticalData) {
+              const missingFields: string[] = [];
+              if (!instanceData.owner || instanceData.owner.trim() === '') {
+                missingFields.push('owner');
+              }
+              if (
+                !instanceData.profileName ||
+                instanceData.profileName.trim() === ''
+              ) {
+                missingFields.push('profileName');
+              }
+              if (instanceData.status !== 'open') {
+                missingFields.push(
+                  `status (actual: ${instanceData.status || 'undefined'})`,
+                );
+              }
+              if (
+                !instanceData.instanceId ||
+                instanceData.instanceId.trim() === ''
+              ) {
+                missingFields.push('instanceId');
+              }
+
+              console.log(
+                brand,
+                colors.yellow(
+                  `❌ ${instanceName} - Datos incompletos, reiniciando...`,
+                ),
+              );
+              console.log(
+                brand,
+                colors.red(`   Campos faltantes: ${missingFields.join(', ')}`),
+              );
+
+              try {
+                await this.restartInstance(instanceName);
+                console.log(
+                  brand,
+                  colors.green(`✅ ${instanceName} - Reiniciado exitosamente`),
+                );
+              } catch (restartError) {
+                console.log(
+                  brand,
+                  colors.red(`❌ ${instanceName} - Error al reiniciar:`),
+                  colors.yellow((restartError as any).message),
+                );
+              }
+            } else {
+              console.log(
+                brand,
+                colors.green(
+                  `✅ ${instanceName} - Datos completos (${instanceData.profileName})`,
+                ),
+              );
+            }
+          }
+        });
+
+        // Ejecutar todas las validaciones en paralelo
+        await Promise.allSettled(promises);
+
+        console.log(
+          brand,
+          colors.blue('🔍 Validación de instancias completada'),
+        );
+      }
+
       return response.data;
     } catch (error) {
       const brand =
@@ -466,12 +625,7 @@ export class EvolutionService {
       console.log(
         brand,
         colors.green('Estado de conexión obtenido:'),
-        colors.cyan(`${instanceName} - ${response.data || 'unknown'}`),
-        colors.cyan(`${instanceName} - ${response.status || 'unknown'}`),
-        colors.cyan(`${instanceName} - ${response.statusText || 'unknown'}`),
-        colors.cyan(`${instanceName} - ${response.headers || 'unknown'}`),
-        colors.cyan(`${instanceName} - ${response.config || 'unknown'}`),
-        colors.cyan(`${instanceName} - ${response.request || 'unknown'}`),
+        colors.cyan(`${instanceName} - ${response.data.state || 'unknown'}`),
       );
 
       return response.data;
