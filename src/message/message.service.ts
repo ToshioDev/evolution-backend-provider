@@ -13,4 +13,8 @@ export class MessageService {
     const created = new this.messageModel(data);
     return created.save();
   }
+
+  async findByLocationId(locationId: string): Promise<Message[]> {
+    return this.messageModel.find({ locationId }).exec();
+  }
 }

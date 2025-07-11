@@ -1,6 +1,8 @@
 import {
   Controller,
   Post,
+  Get,
+  Param,
   Body,
   HttpStatus,
   HttpException,
@@ -16,6 +18,22 @@ export class MessageController {
     private readonly messageService: MessageService,
     private readonly userService: UserService,
   ) {}
+
+  @Get(':locationId')
+  async getMessagesByLocationId(@Param('locationId') locationId: string) {
+    try {
+      const messages = await this.messageService.findByLocationId(locationId);
+      return {
+        status: 200,
+        data: messages,
+        count: messages.length,
+        locationId,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
 
   @Post()
   async create(@Body() createMessageDto: Partial<Message>) {
