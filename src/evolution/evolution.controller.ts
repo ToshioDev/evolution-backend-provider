@@ -55,6 +55,7 @@ export class EvolutionController {
     @UserData() userData: any,
     @Body() bodyRaw: any,
   ): Promise<{ status: string; message: string }> {
+    console.log('[DEBUG] Entered sendMessage endpoint');
     console.log('[DEBUG] /message POST body:', bodyRaw);
     const remoteJid = contact.phone.replace('+', '');
     console.log('[DEBUG] Sending message:', { message, remoteJid, contact });
