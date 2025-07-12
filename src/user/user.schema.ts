@@ -15,6 +15,8 @@ export interface GhlAuth {
   locationId: string;
   isBulkInstallation?: boolean;
   userId: string;
+  expires_at?: Date; 
+  created_at?: Date; 
   [key: string]: any;
 }
 

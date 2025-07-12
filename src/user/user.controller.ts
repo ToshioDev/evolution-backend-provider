@@ -203,23 +203,6 @@ export class UserController {
     }
   }
 
-  @Get('profile')
-  @UseGuards(AuthGuard)
-  async getProfile(
-    @UserData() userData: any,
-    @LocationId() locationId: string,
-  ) {
-    return {
-      status: 'success',
-      message: 'Perfil obtenido con token de usuario',
-      data: {
-        userData,
-        locationId,
-        message: 'Este endpoint requiere token de usuario personalizado',
-      },
-    };
-  }
-
   @Put('profile')
   @UseGuards(AuthGuard)
   async updateProfile(

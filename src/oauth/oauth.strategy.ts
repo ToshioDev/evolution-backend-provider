@@ -16,14 +16,5 @@ export class OauthStrategy extends PassportStrategy(Strategy, 'oauth2') {
     });
   }
 
-  async validate(accessToken: string, refreshToken: string, profile: any, done: Function) {
-    // Aquí puedes buscar o crear el usuario en tu base de datos
-    // y devolver el usuario autenticado
-    const user = {
-      accessToken,
-      refreshToken,
-      profile,
-    };
-    done(null, user);
-  }
+  
 }

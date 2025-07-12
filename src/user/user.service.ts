@@ -172,6 +172,16 @@ export class UserService implements OnModuleInit {
       .exec();
   }
 
+  async getAllUsersWithGhlAuth(): Promise<User[]> {
+    return this.userModel
+      .find({
+        ghlAuth: { $exists: true, $ne: null },
+        'ghlAuth.access_token': { $exists: true },
+        'ghlAuth.refresh_token': { $exists: true },
+      })
+      .exec();
+  }
+
   async findByUserToken(userToken: string): Promise<User | null> {
     return this.userModel.findOne({ userToken }).exec();
   }
