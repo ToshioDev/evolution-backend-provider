@@ -59,16 +59,16 @@ export class EvolutionService {
   ): Promise<any> {
 
     const primaryInstance = await this.getPrimaryInstanceForUser(userId);
-    const instanceName = primaryInstance.instanceName;
-    console.log('[DEBUG] sendMessageToEvolution called with:', { type, target, content, userId, instanceName });
+    const instanceUniqueName = primaryInstance.id;
+    console.log('[DEBUG] sendMessageToEvolution called with:', { type, target, content, userId, instanceUniqueName });
 
     switch (type) {
       case 'audio':
-        return this.sendAudio(content, instanceName);
+        return this.sendAudio(content, instanceUniqueName);
       case 'text':
-        return this.sendMessage(target, content, instanceName);
+        return this.sendMessage(target, content, instanceUniqueName);
       case 'image':
-        return this.sendImage(target, content, instanceName);
+        return this.sendImage(target, content, instanceUniqueName);
       default:
         throw new Error('Unsupported message type');
     }
@@ -511,21 +511,16 @@ export class EvolutionService {
   async getPrimaryInstanceForUser(userId: string): Promise<any> {
     try {
       const user = await this.userService.findById(userId);
-      console.log('[DEBUG] getPrimaryInstanceForUser: user:', user);
+
       if (!user || !user.evolutionInstances) {
-        console.log('[DEBUG] getPrimaryInstanceForUser: No user or no evolutionInstances');
         throw new Error('User not found or no instances available');
       }
-
-      console.log('[DEBUG] getPrimaryInstanceForUser: evolutionInstances:', user.evolutionInstances);
 
       const primaryInstance = user.evolutionInstances.find(
         (instance) => instance.isPrimary === true,
       );
-
       if (!primaryInstance) {
         const firstInstance = user.evolutionInstances[0];
-        console.log('[DEBUG] getPrimaryInstanceForUser: No primary, using firstInstance:', firstInstance);
         if (!firstInstance) {
           throw new Error('No instances available for this user');
         }
