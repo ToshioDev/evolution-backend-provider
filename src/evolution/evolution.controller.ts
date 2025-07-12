@@ -54,14 +54,16 @@ export class EvolutionController {
     @Body('locationId') locationId: string,
     @UserData() userData: any,
   ): Promise<{ status: string; message: string }> {
-    const numberTarget = contact.phone.replace('+', '');
+    const remoteJid = contact.phone.replace('+', '');
+    console.log('[DEBUG] Sending message:', { message, remoteJid, contact });
     try {
       await this.evolutionService.sendMessageToEvolution(
         'text',
-        numberTarget,
+        remoteJid,
         message,
         userData.id,
       );
+      console.log('[DEBUG] Message sent to Evolution API:', { message, remoteJid });
       return { status: 'success', message: 'Mensaje enviado a Evolution API' };
     } catch (error) {
       return {
