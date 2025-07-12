@@ -53,7 +53,9 @@ export class EvolutionController {
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
     @UserData() userData: any,
+    @Body() bodyRaw: any,
   ): Promise<{ status: string; message: string }> {
+    console.log('[DEBUG] /message POST body:', bodyRaw);
     const remoteJid = contact.phone.replace('+', '');
     console.log('[DEBUG] Sending message:', { message, remoteJid, contact });
     try {
