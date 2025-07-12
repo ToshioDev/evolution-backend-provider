@@ -14,7 +14,21 @@ export class MessageService {
     return created.save();
   }
 
-  async findByLocationId(locationId: string): Promise<Message[]> {
-    return this.messageModel.find({ locationId }).exec();
+  async findByLocationId(
+    locationId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<{ messages: Message[]; total: number }> {
+    const skip = (page - 1) * limit;
+    const [messages, total] = await Promise.all([
+      this.messageModel
+        .find({ locationId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.messageModel.countDocuments({ locationId }),
+    ]);
+    return { messages, total };
   }
 }

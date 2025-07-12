@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Param,
+  Query,
   Body,
   HttpStatus,
   HttpException,
@@ -20,14 +21,27 @@ export class MessageController {
   ) {}
 
   @Get(':locationId')
-  async getMessagesByLocationId(@Param('locationId') locationId: string) {
+  async getMessagesByLocationId(
+    @Param('locationId') locationId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+  ) {
     try {
-      const messages = await this.messageService.findByLocationId(locationId);
+      const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+      const limitNum = Math.max(parseInt(limit, 10) || 20, 1);
+      const { messages, total } = await this.messageService.findByLocationId(
+        locationId,
+        pageNum,
+        limitNum,
+      );
       return {
         status: 200,
         data: messages,
-        count: messages.length,
+        total,
+        page: pageNum,
+        limit: limitNum,
         locationId,
+        totalPages: Math.ceil(total / limitNum),
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
