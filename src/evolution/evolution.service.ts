@@ -25,10 +25,8 @@ export class EvolutionService {
 
   constructor(private readonly userService: UserService) {}
 
-
-
-  async sendAudio(audio: string): Promise<any> {
-    const url = `${this.baseUrl}/message/sendWhatsAppAudio/Recepcion Alphanet`;
+  async sendAudio(audio: string, instanceName: string): Promise<any> {
+    const url = `${this.baseUrl}/message/sendWhatsAppAudio/${instanceName}`;
     try {
       const response = await axios.post(
         url,
@@ -57,21 +55,30 @@ export class EvolutionService {
     type: 'audio' | 'text' | 'image',
     target: string,
     content: string,
+    userId: string,
   ): Promise<any> {
+
+    const primaryInstance = await this.getPrimaryInstanceForUser(userId);
+    const instanceName = primaryInstance.instanceName;
+
     switch (type) {
       case 'audio':
-        return this.sendAudio(content);
+        return this.sendAudio(content, instanceName);
       case 'text':
-        return this.sendMessage(target, content);
+        return this.sendMessage(target, content, instanceName);
       case 'image':
-        return this.sendImage(target, content);
+        return this.sendImage(target, content, instanceName);
       default:
         throw new Error('Unsupported message type');
     }
   }
 
-  async sendImage(number: string, media: string): Promise<any> {
-    const url = `${this.baseUrl}/message/sendWhatsapp/Recepcion Alphanet`;
+  async sendImage(
+    number: string,
+    media: string,
+    instanceName: string,
+  ): Promise<any> {
+    const url = `${this.baseUrl}/message/sendWhatsapp/${instanceName}`;
     try {
       const response = await axios.post(
         url,
@@ -100,8 +107,12 @@ export class EvolutionService {
     }
   }
 
-  async sendMessage(number: string, text: string): Promise<any> {
-    const url = `${this.baseUrl}/message/sendText/Recepcion Alphanet`;
+  async sendMessage(
+    number: string,
+    text: string,
+    instanceName: string,
+  ): Promise<any> {
+    const url = `${this.baseUrl}/message/sendText/${instanceName}`;
     try {
       const response = await axios.post(
         url,
@@ -493,6 +504,31 @@ export class EvolutionService {
         restarted: false,
         error: error.message,
       };
+    }
+  }
+
+  async getPrimaryInstanceForUser(userId: string): Promise<any> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user.evolutionInstances) {
+        throw new Error('User not found or no instances available');
+      }
+
+      const primaryInstance = user.evolutionInstances.find(
+        (instance) => instance.isPrimary === true,
+      );
+
+      if (!primaryInstance) {
+        const firstInstance = user.evolutionInstances[0];
+        if (!firstInstance) {
+          throw new Error('No instances available for this user');
+        }
+        return firstInstance;
+      }
+
+      return primaryInstance;
+    } catch (error) {
+      throw new Error(`Failed to get primary instance: ${error.message}`);
     }
   }
 }

@@ -8,9 +8,12 @@ import {
   Delete,
   Param,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { EvolutionService } from './evolution.service';
 import { UserService } from '../user/user.service';
+import { AuthGuard } from '../auth/auth.guard';
+import { UserData } from '../auth/decorators/user.decorator';
 
 @Controller('evolution')
 export class EvolutionController {
@@ -43,11 +46,13 @@ export class EvolutionController {
   }
 
   @Post('message')
+  @UseGuards(AuthGuard)
   async sendMessage(
     @Body('conversationId') conversationId: string,
     @Body('message') message: string,
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
+    @UserData() userData: any,
   ): Promise<{ status: string; message: string }> {
     const remoteJid = `${contact.phone}@whatsapp.net`;
     try {
@@ -55,6 +60,7 @@ export class EvolutionController {
         'text',
         remoteJid,
         message,
+        userData.id,
       );
       return { status: 'success', message: 'Mensaje enviado a Evolution API' };
     } catch (error) {
@@ -237,4 +243,4 @@ export class EvolutionController {
     return this.evolutionService.validateAndRestartInstance(instanceName);
   }
 }
-2
+2;
