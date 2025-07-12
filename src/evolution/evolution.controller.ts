@@ -9,11 +9,22 @@ import {
   Param,
   Query,
   UseGuards,
+  Put,
 } from '@nestjs/common';
 import { EvolutionService } from './evolution.service';
 import { UserService } from '../user/user.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { UserData } from '../auth/decorators/user.decorator';
+import {
+  CreateBasicInstanceDto,
+  UpdateInstanceSettingsDto,
+  ToggleAlwaysOnlineDto,
+  ToggleRejectCallDto,
+  ToggleGroupsIgnoreDto,
+  ToggleReadMessagesDto,
+  ToggleReadStatusDto,
+  ToggleSyncFullHistoryDto,
+} from './dto/instance-settings.dto';
 
 @Controller('evolution')
 export class EvolutionController {
@@ -124,14 +135,10 @@ export class EvolutionController {
     @Param('instanceName') instanceName: string,
   ): Promise<{ status: string; message: string; data?: any }> {
     try {
-      // Eliminar la instancia en evolutionService
       const result = await this.evolutionService.deleteInstance(instanceName);
-
-      // Buscar el usuario que tenga esta instancia en evolutionInstances
       const user =
         await this.userService.findOneByEvolutionInstanceName(instanceName);
       if (user) {
-        // Eliminar la instancia del arreglo evolutionInstances por nombre
         user.evolutionInstances = (user.evolutionInstances || []).filter(
           (inst: any) => inst.name !== instanceName,
         );
@@ -241,6 +248,168 @@ export class EvolutionController {
     @Param('instanceName') instanceName: string,
   ) {
     return this.evolutionService.validateAndRestartInstance(instanceName);
+  }
+
+  @Put('instance/:instanceName/settings')
+  async updateInstanceSettings(
+    @Param('instanceName') instanceName: string,
+    @Body() updateSettingsDto: UpdateInstanceSettingsDto,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const result = await this.evolutionService.updateInstanceSettings(
+        instanceName,
+        updateSettingsDto,
+      );
+      return {
+        status: 'success',
+        message: 'Configuraciones de instancia actualizadas exitosamente',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al actualizar configuraciones: ${error.message}`,
+      };
+    }
+  }
+
+  @Put('instance/:instanceName/always-online')
+  async toggleAlwaysOnline(
+    @Param('instanceName') instanceName: string,
+    @Body() toggleDto: ToggleAlwaysOnlineDto,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const result = await this.evolutionService.toggleAlwaysOnline(
+        instanceName,
+        toggleDto.enabled,
+      );
+      return {
+        status: 'success',
+        message: `Always Online ${toggleDto.enabled ? 'activado' : 'desactivado'} exitosamente`,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al cambiar Always Online: ${error.message}`,
+      };
+    }
+  }
+
+  @Put('instance/:instanceName/reject-call')
+  async toggleRejectCall(
+    @Param('instanceName') instanceName: string,
+    @Body() toggleDto: ToggleRejectCallDto,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const result = await this.evolutionService.toggleRejectCall(
+        instanceName,
+        toggleDto.enabled,
+        toggleDto.msgCall,
+      );
+      return {
+        status: 'success',
+        message: `Rechazar llamadas ${toggleDto.enabled ? 'activado' : 'desactivado'} exitosamente`,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al cambiar rechazo de llamadas: ${error.message}`,
+      };
+    }
+  }
+
+  @Put('instance/:instanceName/groups-ignore')
+  async toggleGroupsIgnore(
+    @Param('instanceName') instanceName: string,
+    @Body() toggleDto: ToggleGroupsIgnoreDto,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const result = await this.evolutionService.toggleGroupsIgnore(
+        instanceName,
+        toggleDto.enabled,
+      );
+      return {
+        status: 'success',
+        message: `Ignorar grupos ${toggleDto.enabled ? 'activado' : 'desactivado'} exitosamente`,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al cambiar ignorar grupos: ${error.message}`,
+      };
+    }
+  }
+
+  @Put('instance/:instanceName/read-messages')
+  async toggleReadMessages(
+    @Param('instanceName') instanceName: string,
+    @Body() toggleDto: ToggleReadMessagesDto,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const result = await this.evolutionService.toggleReadMessages(
+        instanceName,
+        toggleDto.enabled,
+      );
+      return {
+        status: 'success',
+        message: `Leer mensajes ${toggleDto.enabled ? 'activado' : 'desactivado'} exitosamente`,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al cambiar leer mensajes: ${error.message}`,
+      };
+    }
+  }
+
+  @Put('instance/:instanceName/read-status')
+  async toggleReadStatus(
+    @Param('instanceName') instanceName: string,
+    @Body() toggleDto: ToggleReadStatusDto,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const result = await this.evolutionService.toggleReadStatus(
+        instanceName,
+        toggleDto.enabled,
+      );
+      return {
+        status: 'success',
+        message: `Estado de lectura ${toggleDto.enabled ? 'activado' : 'desactivado'} exitosamente`,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al cambiar estado de lectura: ${error.message}`,
+      };
+    }
+  }
+
+  @Put('instance/:instanceName/sync-full-history')
+  async toggleSyncFullHistory(
+    @Param('instanceName') instanceName: string,
+    @Body() toggleDto: ToggleSyncFullHistoryDto,
+  ): Promise<{ status: string; message: string; data?: any }> {
+    try {
+      const result = await this.evolutionService.toggleSyncFullHistory(
+        instanceName,
+        toggleDto.enabled,
+      );
+      return {
+        status: 'success',
+        message: `Sincronización completa del historial ${toggleDto.enabled ? 'activada' : 'desactivada'} exitosamente`,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error al cambiar sincronización del historial: ${error.message}`,
+      };
+    }
   }
 }
 2;

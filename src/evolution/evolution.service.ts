@@ -17,6 +17,16 @@ interface CreateInstanceData {
   syncFullHistory?: boolean;
 }
 
+interface UpdateInstanceSettingsData {
+  alwaysOnline?: boolean;
+  rejectCall?: boolean;
+  msgCall?: string;
+  groupsIgnore?: boolean;
+  readMessages?: boolean;
+  readStatus?: boolean;
+  syncFullHistory?: boolean;
+}
+
 import { UserService } from '../user/user.service';
 
 @Injectable()
@@ -57,10 +67,15 @@ export class EvolutionService {
     content: string,
     userId: string,
   ): Promise<any> {
-
     const primaryInstance = await this.getPrimaryInstanceForUser(userId);
     const instanceUniqueName = primaryInstance.id;
-    console.log('[DEBUG] sendMessageToEvolution called with:', { type, target, content, userId, instanceUniqueName });
+    console.log('[DEBUG] sendMessageToEvolution called with:', {
+      type,
+      target,
+      content,
+      userId,
+      instanceUniqueName,
+    });
 
     switch (type) {
       case 'audio':
@@ -156,6 +171,12 @@ export class EvolutionService {
       instanceName,
       qrcode: true,
       integration: 'WHATSAPP-BAILEYS',
+      rejectCall: false,
+      alwaysOnline: false,
+      readMessages: false,
+      readStatus: false,
+      groupsIgnore: false,
+      syncFullHistory: false,
     };
 
     if (number) {
@@ -169,6 +190,18 @@ export class EvolutionService {
       brand,
       colors.blue('Generando instancia con nombre único:'),
       colors.cyan(instanceName),
+    );
+    console.log(
+      brand,
+      colors.blue('Configuraciones aplicadas:'),
+      colors.cyan(
+        JSON.stringify({
+          rejectCall: basicData.rejectCall,
+          alwaysOnline: basicData.alwaysOnline,
+          readMessages: basicData.readMessages,
+          groupsIgnore: basicData.groupsIgnore,
+        }),
+      ),
     );
 
     // Update user with new instance
@@ -527,11 +560,101 @@ export class EvolutionService {
         return firstInstance;
       }
 
-      console.log('[DEBUG] getPrimaryInstanceForUser: Found primaryInstance:', primaryInstance);
+      console.log(
+        '[DEBUG] getPrimaryInstanceForUser: Found primaryInstance:',
+        primaryInstance,
+      );
       return primaryInstance;
     } catch (error) {
       console.error('[DEBUG] getPrimaryInstanceForUser: Error:', error.message);
       throw new Error(`Failed to get primary instance: ${error.message}`);
     }
+  }
+
+  async updateInstanceSettings(
+    instanceName: string,
+    settings: UpdateInstanceSettingsData,
+  ): Promise<any> {
+    const url = `${this.baseUrl}/settings/set/${instanceName}`;
+    try {
+      const response = await axios.post(url, settings, {
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: process.env.EVOLUTION_API_KEY || '',
+        },
+      });
+
+      const brand =
+        colors.bgBlue.white.bold(' WhatHub ') +
+        colors.bgGreen.white.bold(' GateWay ');
+      console.log(
+        brand,
+        colors.green('Configuraciones de instancia actualizadas:'),
+        colors.cyan(instanceName),
+      );
+      console.log(
+        brand,
+        colors.blue('Nuevas configuraciones:'),
+        colors.cyan(JSON.stringify(settings)),
+      );
+
+      return response.data;
+    } catch (error) {
+      const brand =
+        colors.bgBlue.white.bold(' WhatHub ') +
+        colors.bgGreen.white.bold(' GateWay ');
+      console.error(
+        brand,
+        colors.red('Error al actualizar configuraciones de instancia:'),
+        colors.yellow(error.message),
+      );
+      throw new Error(`Failed to update instance settings: ${error.message}`);
+    }
+  }
+
+  async toggleAlwaysOnline(
+    instanceName: string,
+    enabled: boolean,
+  ): Promise<any> {
+    return this.updateInstanceSettings(instanceName, { alwaysOnline: enabled });
+  }
+
+  async toggleRejectCall(
+    instanceName: string,
+    enabled: boolean,
+    msgCall?: string,
+  ): Promise<any> {
+    const settings: UpdateInstanceSettingsData = { rejectCall: enabled };
+    if (msgCall) {
+      settings.msgCall = msgCall;
+    }
+    return this.updateInstanceSettings(instanceName, settings);
+  }
+
+  async toggleGroupsIgnore(
+    instanceName: string,
+    enabled: boolean,
+  ): Promise<any> {
+    return this.updateInstanceSettings(instanceName, { groupsIgnore: enabled });
+  }
+
+  async toggleReadMessages(
+    instanceName: string,
+    enabled: boolean,
+  ): Promise<any> {
+    return this.updateInstanceSettings(instanceName, { readMessages: enabled });
+  }
+
+  async toggleReadStatus(instanceName: string, enabled: boolean): Promise<any> {
+    return this.updateInstanceSettings(instanceName, { readStatus: enabled });
+  }
+
+  async toggleSyncFullHistory(
+    instanceName: string,
+    enabled: boolean,
+  ): Promise<any> {
+    return this.updateInstanceSettings(instanceName, {
+      syncFullHistory: enabled,
+    });
   }
 }
