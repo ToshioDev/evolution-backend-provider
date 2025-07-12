@@ -54,11 +54,11 @@ export class EvolutionController {
     @Body('locationId') locationId: string,
     @UserData() userData: any,
   ): Promise<{ status: string; message: string }> {
-    const remoteJid = `${contact.phone}@whatsapp.net`;
+    const numberTarget = contact.phone.replace('+', '');
     try {
       await this.evolutionService.sendMessageToEvolution(
         'text',
-        remoteJid,
+        numberTarget,
         message,
         userData.id,
       );
