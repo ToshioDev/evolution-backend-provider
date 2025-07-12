@@ -511,9 +511,13 @@ export class EvolutionService {
   async getPrimaryInstanceForUser(userId: string): Promise<any> {
     try {
       const user = await this.userService.findById(userId);
+      console.log('[DEBUG] getPrimaryInstanceForUser: user:', user);
       if (!user || !user.evolutionInstances) {
+        console.log('[DEBUG] getPrimaryInstanceForUser: No user or no evolutionInstances');
         throw new Error('User not found or no instances available');
       }
+
+      console.log('[DEBUG] getPrimaryInstanceForUser: evolutionInstances:', user.evolutionInstances);
 
       const primaryInstance = user.evolutionInstances.find(
         (instance) => instance.isPrimary === true,
@@ -521,14 +525,17 @@ export class EvolutionService {
 
       if (!primaryInstance) {
         const firstInstance = user.evolutionInstances[0];
+        console.log('[DEBUG] getPrimaryInstanceForUser: No primary, using firstInstance:', firstInstance);
         if (!firstInstance) {
           throw new Error('No instances available for this user');
         }
         return firstInstance;
       }
 
+      console.log('[DEBUG] getPrimaryInstanceForUser: Found primaryInstance:', primaryInstance);
       return primaryInstance;
     } catch (error) {
+      console.error('[DEBUG] getPrimaryInstanceForUser: Error:', error.message);
       throw new Error(`Failed to get primary instance: ${error.message}`);
     }
   }
