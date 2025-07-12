@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { MessageService } from './message.service';
 import { UserService } from '../user/user.service';
+import { EvolutionService } from '../evolution/evolution.service';
 import axios from 'axios';
 import { Message } from './message.schema';
 
@@ -18,6 +19,7 @@ export class MessageController {
   constructor(
     private readonly messageService: MessageService,
     private readonly userService: UserService,
+    private readonly evolutionService: EvolutionService,
   ) {}
 
   @Get(':locationId')
@@ -52,12 +54,29 @@ export class MessageController {
   @Post()
   async create(@Body() createMessageDto: Partial<Message>) {
     try {
+      if (!createMessageDto.message || createMessageDto.message.trim() === '') {
+        throw new HttpException('El mensaje no puede estar vacío', HttpStatus.BAD_REQUEST);
+      }
+
       const message = await this.messageService.create(createMessageDto);
       const generatedMessageId = message.messageId.toString();
 
       const user = await this.userService.findByLocationId(
         createMessageDto.locationId || '1',
       );
+
+      // Internal call to EvolutionService (no HTTP)
+      try {
+        const remoteJid = (createMessageDto.phone || '').replace('+', '');
+        await this.evolutionService.sendMessageToEvolution(
+          'text',
+          remoteJid,
+          createMessageDto.message,
+          createMessageDto.userId || '',
+        );
+      } catch (evoError) {
+        console.error('[ERROR] Error sending message via EvolutionService:', evoError.message);
+      }
 
       if (user && user.ghlAuth && user.ghlAuth.access_token) {
         setTimeout(async () => {

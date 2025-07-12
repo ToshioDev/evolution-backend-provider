@@ -53,20 +53,15 @@ export class EvolutionController {
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
     @UserData() userData: any,
-    @Body() bodyRaw: any,
   ): Promise<{ status: string; message: string }> {
-    console.log('[DEBUG] Entered sendMessage endpoint');
-    console.log('[DEBUG] /message POST body:', bodyRaw);
-    const remoteJid = contact.phone.replace('+', '');
-    console.log('[DEBUG] Sending message:', { message, remoteJid, contact });
+    const numberTarget = contact.phone.replace('+', '');
     try {
       await this.evolutionService.sendMessageToEvolution(
         'text',
-        remoteJid,
+        numberTarget,
         message,
         userData.id,
       );
-      console.log('[DEBUG] Message sent to Evolution API:', { message, remoteJid });
       return { status: 'success', message: 'Mensaje enviado a Evolution API' };
     } catch (error) {
       return {

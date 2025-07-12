@@ -57,6 +57,7 @@ export class EvolutionService {
     content: string,
     userId: string,
   ): Promise<any> {
+    console.log('[DEBUG] sendMessageToEvolution called with:', { type, target, content, userId });
 
     const primaryInstance = await this.getPrimaryInstanceForUser(userId);
     const instanceName = primaryInstance.instanceName;
