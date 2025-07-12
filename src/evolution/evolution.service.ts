@@ -508,16 +508,9 @@ export class EvolutionService {
     }
   }
 
-  async getPrimaryInstanceForUser(userIdOrToken: string): Promise<any> {
+  async getPrimaryInstanceForUser(userId: string): Promise<any> {
     try {
-      // Check if userIdOrToken is a valid MongoDB ObjectId (24 hex chars)
-      const isObjectId = /^[a-f\d]{24}$/i.test(userIdOrToken);
-      let user;
-      if (isObjectId) {
-        user = await this.userService.findById(userIdOrToken);
-      } else {
-        user = await this.userService.findByUserToken(userIdOrToken);
-      }
+      const user = await this.userService.findById(userId);
       if (!user || !user.evolutionInstances) {
         throw new Error('User not found or no instances available');
       }

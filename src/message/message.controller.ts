@@ -68,11 +68,12 @@ export class MessageController {
       // Internal call to EvolutionService (no HTTP)
       try {
         const remoteJid = (createMessageDto.phone || '').replace('+', '');
+        const userId = user && (user as any)._id ? (user as any)._id.toString() : '';
         await this.evolutionService.sendMessageToEvolution(
           'text',
           remoteJid,
           createMessageDto.message,
-          createMessageDto.userId || '',
+          userId,
         );
       } catch (evoError) {
         console.error('[ERROR] Error sending message via EvolutionService:', evoError.message);
