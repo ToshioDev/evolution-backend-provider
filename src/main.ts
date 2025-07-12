@@ -38,7 +38,7 @@ async function bootstrap() {
     colors.bgBlue.white.bold(' WhatHub ') +
     colors.bgGreen.white.bold(' GateWay ');
   const msg =
-    colors.green('RESTful API corriendo en el puerto: ') +
+    colors.green('Release v1 - RESTful API corriendo en el puerto: ') +
     colors.blue(port.toString());
   console.log('\n' + brand + '\n' + msg + '\n');
 }
