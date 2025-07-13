@@ -1,16 +1,18 @@
 import 'dotenv/config';
-import * as colors from 'colors';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { LoggerService } from './common/services/logger.service';
+import { ConfigurationService } from './common/configuration/configuration.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Habilitar CORS para todos los orígenes
+  const loggerService = app.get(LoggerService);
+
   app.enableCors({
-    origin: true, // Permite todos los orígenes
-    credentials: true, // Permite cookies y headers de autenticación
+    origin: true,
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
@@ -21,7 +23,6 @@ async function bootstrap() {
     ],
   });
 
-  // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('WhatHub Gateway API')
     .setDescription('Documentación de la API RESTful de WhatHub Gateway')
@@ -31,15 +32,12 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('', app, document);
 
-  const port = process.env.PORT ?? 3000;
+  const port = app.get(ConfigurationService).getPort();
   await app.listen(port);
 
-  const brand =
-    colors.bgBlue.white.bold(' WhatHub ') +
-    colors.bgGreen.white.bold(' GateWay ');
-  const msg =
-    colors.green('Release v1 - RESTful API corriendo en el puerto: ') +
-    colors.blue(port.toString());
-  console.log('\n' + brand + '\n' + msg + '\n');
+  loggerService.success(
+    `Release v1 - RESTful API corriendo en el puerto: ${port}`,
+    'Bootstrap',
+  );
 }
 bootstrap();
