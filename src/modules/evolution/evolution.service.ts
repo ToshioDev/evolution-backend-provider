@@ -9,6 +9,9 @@ import {
   UpdateInstanceSettingsData,
   ConfigurationService,
 } from '../../common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { UWebSocket, UWebSocketDocument } from '../user/uwebsocket.schema';
 
 @Injectable()
 export class EvolutionService {
@@ -17,6 +20,8 @@ export class EvolutionService {
     private readonly userService: UserService,
     private readonly logger: LoggerService,
     private readonly configService: ConfigurationService,
+    @InjectModel(UWebSocket.name)
+    private readonly uWebSocketModel: Model<UWebSocketDocument>,
   ) {
     this.configService.logModuleConfig('evolution');
   }
@@ -600,8 +605,39 @@ export class EvolutionService {
     const baseUrl = this.configService.getEvolutionApiUrl();
     const url = `${baseUrl}${EvolutionConfigHelper.ENDPOINTS.SET_WEBSOCKET}/${instanceName}`;
 
+    // Preestablecer eventos si no se pasan
+    const defaultEvents = [
+      "CHATS_SET",
+      "CHATS_UPDATE",
+      "CHATS_UPSERT",
+      "MESSAGES_DELETE",
+      "MESSAGES_SET",
+      "MESSAGES_UPDATE",
+      "MESSAGES_UPSERT",
+      "SEND_MESSAGE"
+    ];
+    if (!websocketConfig.events || !Array.isArray(websocketConfig.events) || websocketConfig.events.length === 0) {
+      websocketConfig.events = defaultEvents;
+    }
+
+    // Log de depuración para la petición al microservicio Evolution
+    const payload = { websocket: websocketConfig };
+
+    this.logger.log(
+      'Petición a Evolution API - setWebSocketConfig',
+      'EvolutionService',
+      {
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: this.configService.getEvolutionApiKey(),
+        },
+        body: payload,
+      },
+    );
+
     try {
-      const response = await axios.post(url, websocketConfig, {
+      const response = await axios.post(url, payload, {
         headers: {
           'Content-Type': 'application/json',
           apikey: this.configService.getEvolutionApiKey(),
@@ -613,6 +649,48 @@ export class EvolutionService {
         'Evolution',
         { websocketConfig },
       );
+
+      // Guardar hasWebSocket en la instancia correspondiente
+      const user = await this.userService.findOneByEvolutionInstanceName(instanceName);
+      if (user && user.evolutionInstances && Array.isArray(user.evolutionInstances)) {
+        const updatedInstances = user.evolutionInstances.map((instance) => {
+          if (
+            instance.name === instanceName ||
+            instance.id === instanceName ||
+            instance.evolutionId === instanceName
+          ) {
+            return {
+              ...instance,
+              hasWebSocket: !!websocketConfig.enabled,
+            };
+          }
+          return instance;
+        });
+        await this.userService.setUserEvolutionInstances(user.id.toString(), updatedInstances);
+
+        // Lógica para uwebsockets
+        if (typeof websocketConfig.enabled === 'boolean') {
+          if (websocketConfig.enabled) {
+            // Agregar o actualizar el uwebsocket
+            await this.uWebSocketModel.findOneAndUpdate(
+              { userId: user.id.toString(), instanceName },
+              {
+                userId: user.id.toString(),
+                instanceName,
+                enabled: true,
+                events: websocketConfig.events || [],
+              },
+              { upsert: true, new: true }
+            );
+          } else {
+            // Eliminar el uwebsocket
+            await this.uWebSocketModel.deleteOne({
+              userId: user.id.toString(),
+              instanceName,
+            });
+          }
+        }
+      }
 
       return response.data;
     } catch (error) {

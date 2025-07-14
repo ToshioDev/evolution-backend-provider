@@ -55,6 +55,7 @@ export class User {
         profileName: { type: String, required: true },
         profilePicUrl: { type: String, default: null },
         isPrimary: { type: Boolean, default: false },
+        hasWebSocket: { type: Boolean, default: false },
       },
     ],
     default: [],
@@ -69,6 +70,7 @@ export class User {
     profileName: string;
     isPrimary: boolean;
     profilePicUrl: string | null;
+    hasWebSocket: boolean;
   }>;
 }
 

@@ -4,10 +4,13 @@ import { EvolutionController } from './evolution.controller';
 import { UserModule } from '../user/user.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommonModule } from '../../common/common.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { UWebSocket, UWebSocketSchema } from '../user/uwebsocket.schema';
 
 @Module({
   imports: [
     CommonModule,
+    MongooseModule.forFeature([{ name: UWebSocket.name, schema: UWebSocketSchema }]),
     forwardRef(() => UserModule),
     forwardRef(() => AuthModule),
   ],

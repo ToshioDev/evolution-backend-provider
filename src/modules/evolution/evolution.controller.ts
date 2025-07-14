@@ -592,6 +592,7 @@ export class EvolutionController {
         'EvolutionController',
         {
           error: error.message,
+          errorData: error?.response?.data,
           instanceName,
           websocketConfig: websocketConfigDto,
         },
@@ -600,6 +601,7 @@ export class EvolutionController {
       return {
         status: 'error',
         message: `Error al configurar WebSocket: ${error.message}`,
+        data: { errorData: error?.response?.data },
       };
     }
   }
