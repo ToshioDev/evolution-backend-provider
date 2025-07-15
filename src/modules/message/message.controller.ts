@@ -13,6 +13,7 @@ import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';
 import axios from 'axios';
 import { Message } from './message.schema';
+import { LoggerService } from '../../common/services/logger.service';
 
 @Controller('message')
 export class MessageController {
@@ -20,6 +21,7 @@ export class MessageController {
     private readonly messageService: MessageService,
     private readonly userService: UserService,
     private readonly evolutionService: EvolutionService,
+    private readonly logger: LoggerService,
   ) {}
 
   @Get(':locationId')
@@ -53,6 +55,7 @@ export class MessageController {
 
   @Post()
   async create(@Body() createMessageDto: Partial<Message>) {
+    this.messageService.logIncomingMessageBody(createMessageDto);
     try {
       if (!createMessageDto.message || createMessageDto.message.trim() === '') {
         throw new HttpException(

@@ -15,6 +15,14 @@ export class MessageService {
     this.configService.logModuleConfig('message');
   }
 
+  logIncomingMessageBody(body: Partial<Message>): void {
+    this.loggerService.debug(
+      '[POST /message] Body recibido',
+      'MessageService',
+      body,
+    );
+  }
+
   async create(data: Partial<Message>): Promise<Message> {
     const created = new this.messageModel(data);
     return created.save();
