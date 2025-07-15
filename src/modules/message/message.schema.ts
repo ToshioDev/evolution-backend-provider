@@ -5,8 +5,8 @@ export type MessageDocument = Message & Document;
 
 @Schema({ timestamps: true, strict: false })
 export class Message {
-  @Prop({ required: true })
-  userId: string;
+  @Prop()
+  userId?: string;
 
   @Prop({ type: [MongooseSchema.Types.Mixed], default: [] })
   attachments: any[];
