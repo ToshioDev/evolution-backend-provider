@@ -85,7 +85,7 @@ export class UserController {
   async getUserEvolutionInstances(@CurrentUser() user: any) {
     try {
       const evolutionInstances = await this.evolutionService.getAllInstances();
-
+      this.loggerService.log("Listado de Todas las instancias","UserController",evolutionInstances)
       if (evolutionInstances && evolutionInstances.length > 0) {
         const userInstanceIdentifiers: string[] = [];
         if (user.evolutionInstances) {
