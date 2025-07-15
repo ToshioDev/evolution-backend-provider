@@ -53,6 +53,7 @@ export class MessageController {
 
   @Post()
   async create(@Body() createMessageDto: Partial<Message>) {
+    console.log('[DEBUG][POST /message] Body:', createMessageDto);
     try {
       if (!createMessageDto.message || createMessageDto.message.trim() === '') {
         throw new HttpException(
