@@ -24,7 +24,10 @@ export class MessageService {
   }
 
   async create(data: Partial<Message>): Promise<Message> {
-    const created = new this.messageModel(data);
+    const created = new this.messageModel({
+      ...data,
+      type: 'OUTBOUND',
+    });
     return created.save();
   }
 
