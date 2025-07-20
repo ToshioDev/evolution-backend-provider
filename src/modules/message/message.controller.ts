@@ -63,37 +63,36 @@ export class MessageController {
         Array.isArray(createMessageDto.attachments) &&
         createMessageDto.attachments.length > 0
       ) {
-        // Si viene como string, transformar
-        if (typeof createMessageDto.attachments[0] === 'string') {
-          createMessageDto.attachments = createMessageDto.attachments.map(
-            (url: string) => {
-              const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
-              const ext = extMatch ? extMatch[1].toLowerCase() : '';
-              return {
-                type: extensionToMime[ext] || 'application/octet-stream',
-                data: url,
-              };
-            },
-          );
-        }
-        // Si viene como objeto pero le falta type/data, normalizar
-        else if (typeof createMessageDto.attachments[0] === 'object') {
-          createMessageDto.attachments = createMessageDto.attachments
-            .map((att: any) => {
-              if (att && att.data && !att.type) {
-                const extMatch = att.data.match(/\.([a-zA-Z0-9]+)$/);
-                const ext = extMatch ? extMatch[1].toLowerCase() : '';
-                return {
-                  type: extensionToMime[ext] || 'application/octet-stream',
-                  data: att.data,
-                };
-              }
-              if (att && att.type && att.data) return att;
-              return null;
-            })
-            .filter(Boolean);
-        }
+        createMessageDto.attachments = createMessageDto.attachments.map(
+          (att: any) => {
+            let url = att;
+            if (typeof att === 'object' && att.data) url = att.data;
+            if (typeof att === 'object' && att.type && att.data) return att;
+            const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
+            const ext = extMatch ? extMatch[1].toLowerCase() : '';
+            // type simple para front: image, audio, video, pdf, word, excel, archive, text, file
+            let type = 'file';
+            if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
+              type = 'image';
+            else if (['mp3', 'wav', 'ogg', 'aac'].includes(ext)) type = 'audio';
+            else if (
+              ['mp4', 'mpeg', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(ext)
+            )
+              type = 'video';
+            else if (ext === 'pdf') type = 'pdf';
+            else if (['doc', 'docx'].includes(ext)) type = 'word';
+            else if (['xls', 'xlsx'].includes(ext)) type = 'excel';
+            else if (['zip', 'rar'].includes(ext)) type = 'archive';
+            else if (ext === 'txt') type = 'text';
+            return { type, data: url };
+          },
+        );
       }
+      // Imprimir para depuración
+      console.log(
+        '[DEBUG] attachments normalizados:',
+        createMessageDto.attachments,
+      );
 
       // Detectar si es archivo válido
       if (
@@ -176,36 +175,32 @@ export class MessageController {
         }
 
         const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
+        // type simple para front
+        let ext = '';
+        if (attachmentUrls[0]) {
+          const extMatch = attachmentUrls[0].match(/\.([a-zA-Z0-9]+)$/);
+          ext = extMatch ? extMatch[1].toLowerCase() : '';
+        }
+        let type = 'file';
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
+          type = 'image';
+        else if (['mp3', 'wav', 'ogg', 'aac'].includes(ext)) type = 'audio';
+        else if (
+          ['mp4', 'mpeg', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(ext)
+        )
+          type = 'video';
+        else if (ext === 'pdf') type = 'pdf';
+        else if (['doc', 'docx'].includes(ext)) type = 'word';
+        else if (['xls', 'xlsx'].includes(ext)) type = 'excel';
+        else if (['zip', 'rar'].includes(ext)) type = 'archive';
+        else if (ext === 'txt') type = 'text';
+
         uploadedAttachment = {
-          type: fileType,
+          type,
           data: attachmentUrls[0] || '',
         };
         // Definir el tipo de mensaje para Mongo
-        let mongoType = 'file';
-        if (fileType.startsWith('image')) mongoType = 'image';
-        else if (fileType.startsWith('audio')) mongoType = 'audio';
-        else if (fileType.startsWith('video')) mongoType = 'video';
-        else if (fileType.startsWith('application/pdf')) mongoType = 'pdf';
-        else if (
-          fileType.startsWith('application/msword') ||
-          fileType.startsWith(
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          )
-        )
-          mongoType = 'word';
-        else if (
-          fileType.startsWith('application/vnd.ms-excel') ||
-          fileType.startsWith(
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          )
-        )
-          mongoType = 'excel';
-        else if (
-          fileType.startsWith('application/zip') ||
-          fileType.startsWith('application/vnd.rar')
-        )
-          mongoType = 'archive';
-        else if (fileType.startsWith('text/plain')) mongoType = 'text';
+        let mongoType = type;
 
         // Asegurar que messageId esté presente
         const mongoMessageId =
@@ -223,23 +218,11 @@ export class MessageController {
         Array.isArray(createMessageDto.attachments) &&
         createMessageDto.attachments.length > 0
       ) {
-        // Si attachments ya viene como objetos, asegurarse que solo tengan type y data correctos
-        const normalizedAttachments = createMessageDto.attachments.map(
-          (att: any) => {
-            let type = att.type;
-            let data = att.data;
-            if (!type && data) {
-              const extMatch = data.match(/\.([a-zA-Z0-9]+)$/);
-              const ext = extMatch ? extMatch[1].toLowerCase() : '';
-              type = extensionToMime[ext] || 'application/octet-stream';
-            }
-            return { type, data };
-          },
-        );
+        // attachments ya normalizados arriba
         message = await this.messageService.create({
           ...createMessageDto,
-          attachments: normalizedAttachments,
-          type: 'file',
+          attachments: createMessageDto.attachments,
+          type: createMessageDto.attachments[0]?.type || 'file',
         });
       } else {
         // Mensaje de texto normal
