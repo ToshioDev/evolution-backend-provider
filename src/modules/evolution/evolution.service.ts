@@ -13,12 +13,40 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UWebSocket, UWebSocketDocument } from '../user/uwebsocket.schema';
+import { MessageDocument } from '../message/message.schema';
 
 @Injectable()
 export class EvolutionService {
+  constructor(
+    @Inject(forwardRef(() => UserService))
+    private readonly userService: UserService,
+    private readonly logger: LoggerService,
+    private readonly configService: ConfigurationService,
+    @InjectModel(UWebSocket.name)
+    private readonly uWebSocketModel: Model<UWebSocketDocument>,
+    @InjectModel('Message')
+    private readonly messageModel?: Model<MessageDocument>,
+  ) {
+    this.configService.logModuleConfig('evolution');
+  }
+
   async uploadFileToGHL(
     file: any,
+    extraData?: {
+      userId?: string;
+      contactId?: string;
+      locationId?: string;
+      messageId?: string;
+      conversationId?: string;
+      phone?: string;
+      message?: string;
+    },
   ): Promise<{ status: string; message: string; url?: string; type?: string }> {
+    this.logger.log('Iniciando uploadFileToGHL', 'EvolutionService', {
+      originalname: file?.originalname,
+      mimetype: file?.mimetype,
+      size: file?.size,
+    });
     const allowedTypes = [
       'jpg',
       'jpeg',
@@ -72,66 +100,137 @@ export class EvolutionService {
       tipo = '[comprimido]';
       type = 'compressed';
     }
+    this.logger.log('Tipo de archivo detectado', 'EvolutionService', {
+      ext,
+      tipo,
+      type,
+    });
     if (
       !ext ||
       !allowedTypes.includes(ext) ||
       !allowedMimeTypes.includes(file.mimetype)
     ) {
+      this.logger.error(
+        'Tipo de archivo o mimetype no permitido',
+        'EvolutionService',
+        {
+          ext,
+          mimetype: file.mimetype,
+        },
+      );
       return {
         status: 'error',
         message: `Tipo de archivo no permitido: ${ext} (${file.mimetype})`,
       };
     }
-    // Subir archivo a GHL
-    // Import dinámico para evitar problemas en entornos SSR
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const FormData = require('form-data');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const fetch = require('node-fetch');
-    const form = new FormData();
-    form.append('fileAttachment', file.buffer, file.originalname);
-    const ghlRes = await fetch(
-      'https://services.leadconnectorhq.com/conversations/messages/upload',
-      {
-        method: 'POST',
-        body: form,
-        headers: form.getHeaders(),
-      },
-    );
-    if (!ghlRes.ok) {
+    try {
+      // Subir archivo a GHL
+      // Import dinámico para evitar problemas en entornos SSR
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const FormData = require('form-data');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const fetch = require('node-fetch');
+      const form = new FormData();
+      form.append('fileAttachment', file.buffer, file.originalname);
+      this.logger.log('Enviando archivo a GHL', 'EvolutionService', {
+        url: 'https://services.leadconnectorhq.com/conversations/messages/upload',
+        filename: file.originalname,
+      });
+      const ghlRes = await fetch(
+        'https://services.leadconnectorhq.com/conversations/messages/upload',
+        {
+          method: 'POST',
+          body: form,
+          headers: form.getHeaders(),
+        },
+      );
+      this.logger.log('Respuesta de GHL recibida', 'EvolutionService', {
+        status: ghlRes.status,
+      });
+      if (!ghlRes.ok) {
+        const errorText = await ghlRes.text();
+        this.logger.error('Error al subir archivo a GHL', 'EvolutionService', {
+          status: ghlRes.status,
+          errorText,
+        });
+        return {
+          status: 'error',
+          message: 'Error al subir archivo a GHL',
+        };
+      }
+      const ghlBody = await ghlRes.json();
+      this.logger.log('Body de respuesta de GHL', 'EvolutionService', {
+        ghlBody,
+      });
+      const url =
+        ghlBody?.url ||
+        ghlBody?.fileURL ||
+        ghlBody?.fileUrl ||
+        ghlBody?.Body?.url;
+      if (!url) {
+        this.logger.error(
+          'No se recibió URL del archivo desde GHL',
+          'EvolutionService',
+          { ghlBody },
+        );
+        return {
+          status: 'error',
+          message: 'No se recibió URL del archivo desde GHL',
+        };
+      }
+      this.logger.success(
+        'Archivo subido correctamente a GHL',
+        'EvolutionService',
+        { url, tipo, type },
+      );
+      // Insertar mensaje en la base de datos si extraData está presente
+      if (extraData && this.messageModel) {
+        try {
+          const messageDoc = {
+            userId: extraData.userId,
+            contactId: extraData.contactId,
+            locationId: extraData.locationId,
+            messageId: extraData.messageId || Date.now() + '-' + Math.random(),
+            type,
+            conversationId: extraData.conversationId,
+            phone: extraData.phone,
+            message: extraData.message || tipo,
+            attachments: [{ url, type }],
+          };
+          await this.messageModel.create(messageDoc);
+          this.logger.success(
+            'Mensaje con archivo insertado en MongoDB',
+            'EvolutionService',
+            { messageDoc },
+          );
+        } catch (err) {
+          this.logger.error(
+            'Error al insertar mensaje en MongoDB',
+            'EvolutionService',
+            { error: err?.message },
+          );
+        }
+      }
+      return {
+        status: 'success',
+        message: tipo,
+        url,
+        type,
+      };
+    } catch (err) {
+      this.logger.error(
+        'Excepción al subir archivo a GHL',
+        'EvolutionService',
+        {
+          error: err?.message,
+          stack: err?.stack,
+        },
+      );
       return {
         status: 'error',
-        message: 'Error al subir archivo a GHL',
+        message: 'Excepción al subir archivo a GHL',
       };
     }
-    const ghlBody = await ghlRes.json();
-    const url =
-      ghlBody?.url ||
-      ghlBody?.fileURL ||
-      ghlBody?.fileUrl ||
-      ghlBody?.Body?.url;
-    if (!url) {
-      return {
-        status: 'error',
-        message: 'No se recibió URL del archivo desde GHL',
-      };
-    }
-    return {
-      status: 'success',
-      message: tipo,
-      url,
-      type,
-    };
-  }
-  constructor(
-    @Inject(forwardRef(() => UserService))
-    private readonly userService: UserService,
-    private readonly logger: LoggerService,
-    private readonly configService: ConfigurationService,
-    @InjectModel(UWebSocket.name)
-    private readonly uWebSocketModel: Model<UWebSocketDocument>,
-  ) {
-    this.configService.logModuleConfig('evolution');
   }
 
   async sendAudio(audio: string, instanceName: string): Promise<any> {
