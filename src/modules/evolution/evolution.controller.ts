@@ -10,6 +10,9 @@ import {
   Query,
   UseGuards,
   Put,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,6 +27,7 @@ import { UserService } from '../user/user.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { UserData } from '../../common/decorators/user.decorator';
 import { LoggerService } from '../../common/services/logger.service';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   UpdateInstanceSettingsDto,
   ToggleAlwaysOnlineDto,
@@ -88,44 +92,139 @@ export class EvolutionController {
 
   @Post('message')
   @UseGuards(AuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
   async sendMessage(
     @Body('conversationId') conversationId: string,
     @Body('message') message: string,
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
     @UserData() userData: any,
-  ): Promise<{ status: string; message: string }> {
+    @UploadedFile() file?: Express.Multer.File,
+  ): Promise<{ status: string; message: string; url?: string }> {
+    if (!contact || !contact.phone) {
+      throw new BadRequestException(
+        'El contacto y su teléfono son obligatorios',
+      );
+    }
     const numberTarget = contact.phone.replace('+', '');
-
+    const allowedTypes = [
+      'jpg',
+      'jpeg',
+      'png',
+      'mp4',
+      'mpeg',
+      'zip',
+      'rar',
+      'pdf',
+      'doc',
+      'docx',
+      'txt',
+      'mp3',
+      'wav',
+    ];
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/jpg',
+      'video/mp4',
+      'video/mpeg',
+      'application/zip',
+      'application/x-rar-compressed',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+    ];
     try {
-      this.loggerService.log(
-        'Enviando mensaje via Evolution API',
-        'EvolutionController',
-        {
-          conversationId,
+      if (file) {
+        const ext = file.originalname.split('.').pop()?.toLowerCase();
+        if (
+          !ext ||
+          !allowedTypes.includes(ext) ||
+          !allowedMimeTypes.includes(file.mimetype)
+        ) {
+          return {
+            status: 'error',
+            message: `Tipo de archivo no permitido: ${ext} (${file.mimetype})`,
+          };
+        }
+        // Subir archivo a GHL
+        // Import dinámico para evitar problemas en entornos SSR
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const FormData = require('form-data');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const fetch = require('node-fetch');
+        const form = new FormData();
+        form.append('fileAttachment', file.buffer, file.originalname);
+        const ghlRes = await fetch(
+          'https://services.leadconnectorhq.com/conversations/messages/upload',
+          {
+            method: 'POST',
+            body: form,
+            headers: form.getHeaders(),
+          },
+        );
+        if (!ghlRes.ok) {
+          return {
+            status: 'error',
+            message: 'Error al subir archivo a GHL',
+          };
+        }
+        const ghlBody = await ghlRes.json();
+        const url =
+          ghlBody?.url ||
+          ghlBody?.fileURL ||
+          ghlBody?.fileUrl ||
+          ghlBody?.Body?.url;
+        if (!url) {
+          return {
+            status: 'error',
+            message: 'No se recibió URL del archivo desde GHL',
+          };
+        }
+        return {
+          status: 'success',
+          message: 'Archivo subido y validado correctamente',
+          url,
+        };
+      } else if (message && typeof message === 'string') {
+        this.loggerService.log(
+          'Enviando mensaje via Evolution API',
+          'EvolutionController',
+          {
+            conversationId,
+            numberTarget,
+            userId: userData.id,
+            locationId: userData.locationId,
+          },
+        );
+        await this.evolutionService.sendMessageToEvolution(
+          'text',
           numberTarget,
-          userId: userData.id,
-          locationId: userData.locationId,
-        },
-      );
-
-      await this.evolutionService.sendMessageToEvolution(
-        'text',
-        numberTarget,
-        message,
-        userData.id,
-      );
-
-      this.loggerService.success(
-        'Mensaje enviado exitosamente via Evolution API',
-        'EvolutionController',
-        { conversationId, numberTarget, userId: userData.id },
-      );
-
-      return { status: 'success', message: 'Mensaje enviado a Evolution API' };
+          message,
+          userData.id,
+        );
+        this.loggerService.success(
+          'Mensaje enviado exitosamente via Evolution API',
+          'EvolutionController',
+          { conversationId, numberTarget, userId: userData.id },
+        );
+        return {
+          status: 'success',
+          message: 'Mensaje enviado a Evolution API',
+        };
+      } else {
+        return {
+          status: 'error',
+          message: 'Debe enviar un mensaje de texto o un archivo válido',
+        };
+      }
     } catch (error) {
       this.loggerService.error(
-        'Error al enviar mensaje via Evolution API',
+        'Error al enviar mensaje o archivo via Evolution API',
         'EvolutionController',
         {
           conversationId,
@@ -136,7 +235,7 @@ export class EvolutionController {
       );
       return {
         status: 'error',
-        message: 'Número inválido o error al contactar Evolution API',
+        message: 'Error al procesar mensaje o archivo',
       };
     }
   }
