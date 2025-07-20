@@ -101,7 +101,7 @@ export class EvolutionController {
     @Body('locationId') locationId: string,
     @UserData() userData: any,
     @UploadedFile() file?: any,
-  ): Promise<{ status: string; message: string; url?: string }> {
+  ): Promise<{ status: string; message: string; url?: string; type?: string }> {
     if (!contact || !contact.phone) {
       throw new BadRequestException(
         'El contacto y su teléfono son obligatorios',
@@ -187,19 +187,34 @@ export class EvolutionController {
           };
         }
 
-        // Determinar tipo de archivo para el mensaje
+        // Determinar tipo de archivo para el mensaje y el campo type
         let tipo = '[archivo]';
-        if (['jpg', 'jpeg', 'png'].includes(ext)) tipo = '[imagen]';
-        else if (['mp4', 'mpeg'].includes(ext)) tipo = '[video]';
-        else if (['mp3', 'wav'].includes(ext)) tipo = '[audio]';
-        else if (['pdf'].includes(ext)) tipo = '[pdf]';
-        else if (['doc', 'docx', 'txt'].includes(ext)) tipo = '[documento]';
-        else if (['zip', 'rar'].includes(ext)) tipo = '[comprimido]';
+        let type = 'archivo';
+        if (['jpg', 'jpeg', 'png'].includes(ext)) {
+          tipo = '[imagen]';
+          type = 'image';
+        } else if (['mp4', 'mpeg'].includes(ext)) {
+          tipo = '[video]';
+          type = 'video';
+        } else if (['mp3', 'wav'].includes(ext)) {
+          tipo = '[audio]';
+          type = 'audio';
+        } else if (['pdf'].includes(ext)) {
+          tipo = '[pdf]';
+          type = 'pdf';
+        } else if (['doc', 'docx', 'txt'].includes(ext)) {
+          tipo = '[documento]';
+          type = 'document';
+        } else if (['zip', 'rar'].includes(ext)) {
+          tipo = '[comprimido]';
+          type = 'compressed';
+        }
 
         return {
           status: 'success',
           message: tipo,
           url,
+          type,
         };
       } else if (message && typeof message === 'string') {
         this.loggerService.log(
