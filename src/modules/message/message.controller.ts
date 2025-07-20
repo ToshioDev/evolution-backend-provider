@@ -10,6 +10,7 @@ import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';
 import axios from 'axios';
 import { extname } from 'path';
+import { Types } from 'mongoose';
 
 @Controller('message')
 export class MessageController {
@@ -23,9 +24,25 @@ export class MessageController {
   async create(@Body() createMessageDto: any) {
     this.messageService.logIncomingMessageBody(createMessageDto);
     try {
+      // Normalizar userId a ObjectId si es posible
+      let userId = createMessageDto.userId;
+      let user: any = null;
+      if (userId && Types.ObjectId.isValid(userId)) {
+        user = await this.userService.findById(userId);
+      } else if (createMessageDto.locationId) {
+        user = await this.userService.findByLocationId(
+          createMessageDto.locationId,
+        );
+        if (user && user._id) userId = user._id.toString();
+      }
+      if (!user) {
+        throw new HttpException(
+          'Usuario no encontrado para userId o locationId',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
       let isFile = false;
       let fileType = '';
-      let fileAttachment: any = null;
       let uploadedAttachment: any = null;
       let message;
       const allowedExtensions = [
@@ -89,10 +106,6 @@ export class MessageController {
           form.append('fileAttachment', fileBuffer, 'archivo.' + ext);
           form.append('conversationId', createMessageDto.conversationId || '');
           form.append('locationId', createMessageDto.locationId || '');
-          // Buscar token de GoHighLevel
-          const user = await this.userService.findByLocationId(
-            createMessageDto.locationId || '1',
-          );
           const accessToken = user?.ghlAuth?.access_token;
           if (!accessToken) {
             throw new HttpException(
@@ -170,7 +183,7 @@ export class MessageController {
           attachments[0].type,
           createMessageDto.phone,
           attachments[0].data,
-          createMessageDto.userId,
+          userId,
         );
       } else {
         // Mensaje de texto normal
@@ -182,45 +195,11 @@ export class MessageController {
           'text',
           createMessageDto.phone,
           createMessageDto.message,
-          createMessageDto.userId,
+          userId,
         );
       }
 
-      // Buscar usuario y enviar mensaje a Evolution
-      const user = await this.userService.findByLocationId(
-        createMessageDto.locationId || '1',
-      );
-      try {
-        const remoteJid = (createMessageDto.phone || '').replace('+', '');
-        const userId =
-          user && (user as any)._id ? (user as any)._id.toString() : '';
-        if (isFile) {
-          let evolutionType: 'image' | 'audio' | 'text' = 'text';
-          if (fileType.startsWith('image')) evolutionType = 'image';
-          else if (fileType.startsWith('audio')) evolutionType = 'audio';
-          else if (fileType.startsWith('video')) evolutionType = 'image';
-          else evolutionType = 'image';
-          await this.evolutionService.sendMessageToEvolution(
-            evolutionType,
-            remoteJid,
-            uploadedAttachment?.data || '',
-            userId,
-          );
-        } else {
-          await this.evolutionService.sendMessageToEvolution(
-            'text',
-            remoteJid,
-            createMessageDto.message || '',
-            userId,
-          );
-        }
-      } catch (evoError) {
-        console.error(
-          '[ERROR] Error sending message via EvolutionService:',
-          'MessageController',
-          evoError.message,
-        );
-      }
+      // Ya no se hace doble envío a Evolution ni doble búsqueda de usuario
 
       // Actualizar status en GoHighLevel si corresponde
       if (user && user.ghlAuth && user.ghlAuth.access_token) {
