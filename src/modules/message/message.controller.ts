@@ -58,6 +58,43 @@ export class MessageController {
         wav: 'audio/wav',
       };
 
+      // Normalizar attachments: siempre debe ser array de objetos {type, data}
+      if (
+        Array.isArray(createMessageDto.attachments) &&
+        createMessageDto.attachments.length > 0
+      ) {
+        // Si viene como string, transformar
+        if (typeof createMessageDto.attachments[0] === 'string') {
+          createMessageDto.attachments = createMessageDto.attachments.map(
+            (url: string) => {
+              const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
+              const ext = extMatch ? extMatch[1].toLowerCase() : '';
+              return {
+                type: extensionToMime[ext] || 'application/octet-stream',
+                data: url,
+              };
+            },
+          );
+        }
+        // Si viene como objeto pero le falta type/data, normalizar
+        else if (typeof createMessageDto.attachments[0] === 'object') {
+          createMessageDto.attachments = createMessageDto.attachments
+            .map((att: any) => {
+              if (att && att.data && !att.type) {
+                const extMatch = att.data.match(/\.([a-zA-Z0-9]+)$/);
+                const ext = extMatch ? extMatch[1].toLowerCase() : '';
+                return {
+                  type: extensionToMime[ext] || 'application/octet-stream',
+                  data: att.data,
+                };
+              }
+              if (att && att.type && att.data) return att;
+              return null;
+            })
+            .filter(Boolean);
+        }
+      }
+
       // Detectar si es archivo válido
       if (
         Array.isArray(createMessageDto.attachments) &&
@@ -72,37 +109,15 @@ export class MessageController {
             isFile = true;
             fileType = fileAttachment.mimetype;
           }
-        } else if (
-          fileAttachment &&
-          (fileAttachment.url || typeof fileAttachment === 'string')
-        ) {
-          const url = fileAttachment.url || fileAttachment;
+        } else if (fileAttachment && fileAttachment.data) {
+          const url = fileAttachment.data;
           const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
           const ext = extMatch ? extMatch[1].toLowerCase() : '';
           if (allowedExtensions.includes(ext)) {
             isFile = true;
             fileType = extensionToMime[ext] || 'application/octet-stream';
-            isFile = true;
-            fileType = extensionToMime[ext] || 'application/octet-stream';
           }
         }
-      }
-
-      // Si attachments es array de strings (URLs), transformarlas a objetos tipo { type, data }
-      if (
-        Array.isArray(createMessageDto.attachments) &&
-        typeof createMessageDto.attachments[0] === 'string'
-      ) {
-        createMessageDto.attachments = createMessageDto.attachments.map(
-          (url: string) => {
-            const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
-            const ext = extMatch ? extMatch[1].toLowerCase() : '';
-            return {
-              type: extensionToMime[ext] || 'application/octet-stream',
-              data: url,
-            };
-          },
-        );
       }
 
       // Validar mensaje de texto si no es archivo
