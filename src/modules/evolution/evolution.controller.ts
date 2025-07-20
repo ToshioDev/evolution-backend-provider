@@ -100,7 +100,7 @@ export class EvolutionController {
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
     @UserData() userData: any,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: any,
   ): Promise<{ status: string; message: string; url?: string }> {
     if (!contact || !contact.phone) {
       throw new BadRequestException(
