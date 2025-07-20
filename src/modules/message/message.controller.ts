@@ -133,6 +133,16 @@ export class MessageController {
       // Guardar el mensaje en la base de datos
       let message;
       let uploadedAttachment: any = null;
+      // Si attachments es array de strings (URLs), transformarlas a objetos tipo { type, data }
+      if (
+        Array.isArray(createMessageDto.attachments) &&
+        typeof createMessageDto.attachments[0] === 'string'
+      ) {
+        createMessageDto.attachments = createMessageDto.attachments.map(
+          (url: string) => ({ type: 'url', data: '' }),
+        );
+      }
+
       if (isFile) {
         // Subir archivo a GoHighLevel y guardar la URL
         const FormData = require('form-data');
@@ -176,12 +186,8 @@ export class MessageController {
 
         const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
         uploadedAttachment = {
-          originalname:
-            fileAttachment.originalname || fileAttachment.filename || 'archivo',
-          filename:
-            fileAttachment.filename || fileAttachment.originalname || 'archivo',
-          mimetype: fileAttachment.mimetype || '',
-          url: attachmentUrls[0] || '',
+          type: fileType,
+          data: attachmentUrls[0] || '',
         };
         // Definir el tipo de mensaje para Mongo
         let mongoType = 'file';
@@ -222,6 +228,22 @@ export class MessageController {
           type: mongoType,
           messageId: mongoMessageId,
         });
+      } else if (
+        Array.isArray(createMessageDto.attachments) &&
+        createMessageDto.attachments.length > 0
+      ) {
+        // Si attachments ya viene como objetos, asegurarse que solo tengan type y data
+        const normalizedAttachments = createMessageDto.attachments.map(
+          (att: any) => ({
+            type: att.type || 'url',
+            data: att.data || '',
+          }),
+        );
+        message = await this.messageService.create({
+          ...createMessageDto,
+          attachments: normalizedAttachments,
+          type: 'file',
+        });
       } else {
         // Mensaje de texto normal
         message = await this.messageService.create({
@@ -229,7 +251,6 @@ export class MessageController {
           type: 'text',
         });
       }
-      const generatedMessageId = message.messageId?.toString() || '';
 
       // Buscar usuario
       const user = await this.userService.findByLocationId(
@@ -284,7 +305,7 @@ export class MessageController {
           try {
             await axios({
               method: 'PUT',
-              url: `https://services.leadconnectorhq.com/conversations/messages/${generatedMessageId}/status`,
+              url: `https://services.leadconnectorhq.com/conversations/messages/${message.messageId}/status`,
               headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
