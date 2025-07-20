@@ -1,7 +1,7 @@
 import { Controller, HttpStatus, HttpException, Body, Post } from '@nestjs/common';
-import type { MessageService } from './message.service';
-import type { UserService } from '../user/user.service';
-import type { EvolutionService } from '../evolution/evolution.service';
+import { MessageService } from './message.service';
+import { UserService } from '../user/user.service';
+import { EvolutionService } from '../evolution/evolution.service';
 import axios from 'axios';
 
 @Controller('message')
