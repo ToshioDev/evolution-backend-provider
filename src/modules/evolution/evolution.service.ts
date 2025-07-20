@@ -1,3 +1,4 @@
+// ...existing code...
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import axios from 'axios';
 import { UserService } from '../user/user.service';
@@ -15,6 +16,113 @@ import { UWebSocket, UWebSocketDocument } from '../user/uwebsocket.schema';
 
 @Injectable()
 export class EvolutionService {
+  async uploadFileToGHL(
+    file: any,
+  ): Promise<{ status: string; message: string; url?: string; type?: string }> {
+    const allowedTypes = [
+      'jpg',
+      'jpeg',
+      'png',
+      'mp4',
+      'mpeg',
+      'zip',
+      'rar',
+      'pdf',
+      'doc',
+      'docx',
+      'txt',
+      'mp3',
+      'wav',
+    ];
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/jpg',
+      'video/mp4',
+      'video/mpeg',
+      'application/zip',
+      'application/x-rar-compressed',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+    ];
+    const ext = file.originalname.split('.').pop()?.toLowerCase();
+    let tipo = '[archivo]';
+    let type = 'archivo';
+    if (['jpg', 'jpeg', 'png'].includes(ext)) {
+      tipo = '[imagen]';
+      type = 'image';
+    } else if (['mp4', 'mpeg'].includes(ext)) {
+      tipo = '[video]';
+      type = 'video';
+    } else if (['mp3', 'wav'].includes(ext)) {
+      tipo = '[audio]';
+      type = 'audio';
+    } else if (['pdf'].includes(ext)) {
+      tipo = '[pdf]';
+      type = 'pdf';
+    } else if (['doc', 'docx', 'txt'].includes(ext)) {
+      tipo = '[documento]';
+      type = 'document';
+    } else if (['zip', 'rar'].includes(ext)) {
+      tipo = '[comprimido]';
+      type = 'compressed';
+    }
+    if (
+      !ext ||
+      !allowedTypes.includes(ext) ||
+      !allowedMimeTypes.includes(file.mimetype)
+    ) {
+      return {
+        status: 'error',
+        message: `Tipo de archivo no permitido: ${ext} (${file.mimetype})`,
+      };
+    }
+    // Subir archivo a GHL
+    // Import dinámico para evitar problemas en entornos SSR
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const FormData = require('form-data');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fetch = require('node-fetch');
+    const form = new FormData();
+    form.append('fileAttachment', file.buffer, file.originalname);
+    const ghlRes = await fetch(
+      'https://services.leadconnectorhq.com/conversations/messages/upload',
+      {
+        method: 'POST',
+        body: form,
+        headers: form.getHeaders(),
+      },
+    );
+    if (!ghlRes.ok) {
+      return {
+        status: 'error',
+        message: 'Error al subir archivo a GHL',
+      };
+    }
+    const ghlBody = await ghlRes.json();
+    const url =
+      ghlBody?.url ||
+      ghlBody?.fileURL ||
+      ghlBody?.fileUrl ||
+      ghlBody?.Body?.url;
+    if (!url) {
+      return {
+        status: 'error',
+        message: 'No se recibió URL del archivo desde GHL',
+      };
+    }
+    return {
+      status: 'success',
+      message: tipo,
+      url,
+      type,
+    };
+  }
   constructor(
     @Inject(forwardRef(() => UserService))
     private readonly userService: UserService,
@@ -607,16 +715,20 @@ export class EvolutionService {
 
     // Preestablecer eventos si no se pasan
     const defaultEvents = [
-      "CHATS_SET",
-      "CHATS_UPDATE",
-      "CHATS_UPSERT",
-      "MESSAGES_DELETE",
-      "MESSAGES_SET",
-      "MESSAGES_UPDATE",
-      "MESSAGES_UPSERT",
-      "SEND_MESSAGE"
+      'CHATS_SET',
+      'CHATS_UPDATE',
+      'CHATS_UPSERT',
+      'MESSAGES_DELETE',
+      'MESSAGES_SET',
+      'MESSAGES_UPDATE',
+      'MESSAGES_UPSERT',
+      'SEND_MESSAGE',
     ];
-    if (!websocketConfig.events || !Array.isArray(websocketConfig.events) || websocketConfig.events.length === 0) {
+    if (
+      !websocketConfig.events ||
+      !Array.isArray(websocketConfig.events) ||
+      websocketConfig.events.length === 0
+    ) {
       websocketConfig.events = defaultEvents;
     }
 
@@ -651,8 +763,13 @@ export class EvolutionService {
       );
 
       // Guardar hasWebSocket en la instancia correspondiente
-      const user = await this.userService.findOneByEvolutionInstanceName(instanceName);
-      if (user && user.evolutionInstances && Array.isArray(user.evolutionInstances)) {
+      const user =
+        await this.userService.findOneByEvolutionInstanceName(instanceName);
+      if (
+        user &&
+        user.evolutionInstances &&
+        Array.isArray(user.evolutionInstances)
+      ) {
         const updatedInstances = user.evolutionInstances.map((instance) => {
           if (
             instance.name === instanceName ||
@@ -666,7 +783,10 @@ export class EvolutionService {
           }
           return instance;
         });
-        await this.userService.setUserEvolutionInstances(user.id.toString(), updatedInstances);
+        await this.userService.setUserEvolutionInstances(
+          user.id.toString(),
+          updatedInstances,
+        );
 
         // Lógica para uwebsockets
         if (typeof websocketConfig.enabled === 'boolean') {
@@ -680,7 +800,7 @@ export class EvolutionService {
                 enabled: true,
                 events: websocketConfig.events || [],
               },
-              { upsert: true, new: true }
+              { upsert: true, new: true },
             );
           } else {
             // Eliminar el uwebsocket

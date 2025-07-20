@@ -1,3 +1,4 @@
+// ...existing code...
 import 'multer';
 import {
   Controller,
@@ -43,6 +44,40 @@ import {
 @ApiTags('evolution')
 @Controller('evolution')
 export class EvolutionController {
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @UploadedFile() file?: any,
+    @Body('conversationId') conversationId?: string,
+    @Body('locationId') locationId?: string,
+    @Body('attachmentUrls') attachmentUrls?: string[],
+  ): Promise<any> {
+    if (!file) {
+      return {
+        status: 'error',
+        message: 'No se recibió archivo',
+      };
+    }
+    if (
+      !conversationId ||
+      !locationId ||
+      !attachmentUrls ||
+      !Array.isArray(attachmentUrls)
+    ) {
+      return {
+        status: 'error',
+        message:
+          'Faltan campos requeridos: conversationId, locationId o attachmentUrls',
+      };
+    }
+    const uploadResult = await this.evolutionService.uploadFileToGHL(file);
+    return {
+      ...uploadResult,
+      conversationId,
+      locationId,
+      attachmentUrls,
+    };
+  }
   constructor(
     private readonly evolutionService: EvolutionService,
     private readonly userService: UserService,
@@ -92,129 +127,45 @@ export class EvolutionController {
   }
 
   @Post('message')
-  @UseGuards(AuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
   async sendMessage(
     @Body('conversationId') conversationId: string,
     @Body('message') message: string,
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
     @UserData() userData: any,
-    @UploadedFile() file?: any,
-  ): Promise<{ status: string; message: string; url?: string; type?: string }> {
+    @Body('fileUrl') fileUrl?: string,
+    @Body('fileType') fileType?: string,
+    @Body('fileMessage') fileMessage?: string,
+  ): Promise<{ status: string; message: string; url?: string; type?: string; attachments?: { url: string; type: string }[] }> {
     if (!contact || !contact.phone) {
       throw new BadRequestException(
         'El contacto y su teléfono son obligatorios',
       );
     }
     const numberTarget = contact.phone.replace('+', '');
-    const allowedTypes = [
-      'jpg',
-      'jpeg',
-      'png',
-      'mp4',
-      'mpeg',
-      'zip',
-      'rar',
-      'pdf',
-      'doc',
-      'docx',
-      'txt',
-      'mp3',
-      'wav',
-    ];
-    const allowedMimeTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-      'video/mp4',
-      'video/mpeg',
-      'application/zip',
-      'application/x-rar-compressed',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-      'audio/mpeg',
-      'audio/mp3',
-      'audio/wav',
-    ];
     try {
-      if (file) {
-        const ext = file.originalname.split('.').pop()?.toLowerCase();
-        if (
-          !ext ||
-          !allowedTypes.includes(ext) ||
-          !allowedMimeTypes.includes(file.mimetype)
-        ) {
-          return {
-            status: 'error',
-            message: `Tipo de archivo no permitido: ${ext} (${file.mimetype})`,
-          };
-        }
-        // Subir archivo a GHL
-        // Import dinámico para evitar problemas en entornos SSR
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const FormData = require('form-data');
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const fetch = require('node-fetch');
-        const form = new FormData();
-        form.append('fileAttachment', file.buffer, file.originalname);
-        const ghlRes = await fetch(
-          'https://services.leadconnectorhq.com/conversations/messages/upload',
-          {
-            method: 'POST',
-            body: form,
-            headers: form.getHeaders(),
-          },
+      if (fileUrl && fileType && fileMessage) {
+        // Si es archivo, determina el tipo para EvolutionService
+        let typeForService: 'audio' | 'image' = 'image';
+        if (fileType === 'audio') typeForService = 'audio';
+        else if (fileType === 'image' || fileType === 'video')
+          typeForService = 'image';
+        // Aquí podrías guardar en Mongo o reenviar a GHL, según tu lógica
+        await this.evolutionService.sendMessageToEvolution(
+          typeForService,
+          numberTarget,
+          fileUrl,
+          userData.id,
         );
-        if (!ghlRes.ok) {
-          return {
-            status: 'error',
-            message: 'Error al subir archivo a GHL',
-          };
-        }
-        const ghlBody = await ghlRes.json();
-        const url =
-          ghlBody?.url ||
-          ghlBody?.fileURL ||
-          ghlBody?.fileUrl ||
-          ghlBody?.Body?.url;
-        if (!url) {
-          return {
-            status: 'error',
-            message: 'No se recibió URL del archivo desde GHL',
-          };
-        }
-
-        // Determinar tipo de archivo para el mensaje y el campo type
-        let tipo = '[archivo]';
-        let type = 'archivo';
-        if (['jpg', 'jpeg', 'png'].includes(ext)) {
-          tipo = '[imagen]';
-          type = 'image';
-        } else if (['mp4', 'mpeg'].includes(ext)) {
-          tipo = '[video]';
-          type = 'video';
-        } else if (['mp3', 'wav'].includes(ext)) {
-          tipo = '[audio]';
-          type = 'audio';
-        } else if (['pdf'].includes(ext)) {
-          tipo = '[pdf]';
-          type = 'pdf';
-        } else if (['doc', 'docx', 'txt'].includes(ext)) {
-          tipo = '[documento]';
-          type = 'document';
-        } else if (['zip', 'rar'].includes(ext)) {
-          tipo = '[comprimido]';
-          type = 'compressed';
-        }
-
         return {
           status: 'success',
-          message: tipo,
-          url,
-          type,
+          message: fileMessage,
+          attachments: [
+            {
+              url: fileUrl,
+              type: fileType,
+            },
+          ],
         };
       } else if (message && typeof message === 'string') {
         this.loggerService.log(
