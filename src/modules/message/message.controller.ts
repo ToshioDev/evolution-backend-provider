@@ -176,7 +176,11 @@ export class MessageController {
 
         const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
         uploadedAttachment = {
-          ...fileAttachment,
+          originalname:
+            fileAttachment.originalname || fileAttachment.filename || 'archivo',
+          filename:
+            fileAttachment.filename || fileAttachment.originalname || 'archivo',
+          mimetype: fileAttachment.mimetype || '',
           url: attachmentUrls[0] || '',
         };
         // Definir el tipo de mensaje para Mongo
@@ -206,11 +210,17 @@ export class MessageController {
         )
           mongoType = 'powerpoint';
 
+        // Asegurar que messageId esté presente
+        const mongoMessageId =
+          createMessageDto.messageId ||
+          `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+
         message = await this.messageService.create({
           ...createMessageDto,
           message: fileName,
           attachments: [uploadedAttachment],
           type: mongoType,
+          messageId: mongoMessageId,
         });
       } else {
         // Mensaje de texto normal
@@ -299,21 +309,23 @@ export class MessageController {
         status: 200,
         data: {
           userId: createMessageDto.userId,
-          attachments: isFile
-            ? [uploadedAttachment]
-            : createMessageDto.attachments,
+          attachments:
+            isFile && uploadedAttachment
+              ? [uploadedAttachment]
+              : createMessageDto.attachments,
           contactId: createMessageDto.contactId,
           locationId: createMessageDto.locationId,
-          messageId: generatedMessageId,
+          messageId: message.messageId,
           type: message.type,
           conversationId: createMessageDto.conversationId,
           phone: createMessageDto.phone,
-          message: isFile
-            ? uploadedAttachment?.originalname ||
-              uploadedAttachment?.filename ||
-              uploadedAttachment?.url ||
-              'archivo'
-            : createMessageDto.message,
+          message:
+            isFile && uploadedAttachment
+              ? uploadedAttachment.originalname ||
+                uploadedAttachment.filename ||
+                uploadedAttachment.url ||
+                'archivo'
+              : createMessageDto.message,
         },
         savedMessage: message,
         timestamp: new Date().toISOString(),
