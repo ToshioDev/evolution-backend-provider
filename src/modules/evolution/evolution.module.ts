@@ -13,7 +13,6 @@ import { Message, MessageSchema } from '../message/message.schema';
     CommonModule,
     MongooseModule.forFeature([
       { name: UWebSocket.name, schema: UWebSocketSchema },
-      { name: Message.name, schema: MessageSchema },
     ]),
     forwardRef(() => UserModule),
     forwardRef(() => AuthModule),

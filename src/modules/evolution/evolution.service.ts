@@ -1,4 +1,3 @@
-// ...existing code...
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import axios from 'axios';
 import { UserService } from '../user/user.service';
@@ -13,7 +12,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UWebSocket, UWebSocketDocument } from '../user/uwebsocket.schema';
-import { MessageDocument } from '../message/message.schema';
 
 @Injectable()
 export class EvolutionService {
@@ -24,213 +22,8 @@ export class EvolutionService {
     private readonly configService: ConfigurationService,
     @InjectModel(UWebSocket.name)
     private readonly uWebSocketModel: Model<UWebSocketDocument>,
-    @InjectModel('Message')
-    private readonly messageModel?: Model<MessageDocument>,
   ) {
     this.configService.logModuleConfig('evolution');
-  }
-
-  async uploadFileToGHL(
-    file: any,
-    extraData?: {
-      userId?: string;
-      contactId?: string;
-      locationId?: string;
-      messageId?: string;
-      conversationId?: string;
-      phone?: string;
-      message?: string;
-    },
-  ): Promise<{ status: string; message: string; url?: string; type?: string }> {
-    this.logger.log('Iniciando uploadFileToGHL', 'EvolutionService', {
-      originalname: file?.originalname,
-      mimetype: file?.mimetype,
-      size: file?.size,
-    });
-    const allowedTypes = [
-      'jpg',
-      'jpeg',
-      'png',
-      'mp4',
-      'mpeg',
-      'zip',
-      'rar',
-      'pdf',
-      'doc',
-      'docx',
-      'txt',
-      'mp3',
-      'wav',
-    ];
-    const allowedMimeTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-      'video/mp4',
-      'video/mpeg',
-      'application/zip',
-      'application/x-rar-compressed',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-      'audio/mpeg',
-      'audio/mp3',
-      'audio/wav',
-    ];
-    const ext = file.originalname.split('.').pop()?.toLowerCase();
-    let tipo = '[archivo]';
-    let type = 'archivo';
-    if (['jpg', 'jpeg', 'png'].includes(ext)) {
-      tipo = '[imagen]';
-      type = 'image';
-    } else if (['mp4', 'mpeg'].includes(ext)) {
-      tipo = '[video]';
-      type = 'video';
-    } else if (['mp3', 'wav'].includes(ext)) {
-      tipo = '[audio]';
-      type = 'audio';
-    } else if (['pdf'].includes(ext)) {
-      tipo = '[pdf]';
-      type = 'pdf';
-    } else if (['doc', 'docx', 'txt'].includes(ext)) {
-      tipo = '[documento]';
-      type = 'document';
-    } else if (['zip', 'rar'].includes(ext)) {
-      tipo = '[comprimido]';
-      type = 'compressed';
-    }
-    this.logger.log('Tipo de archivo detectado', 'EvolutionService', {
-      ext,
-      tipo,
-      type,
-    });
-    if (
-      !ext ||
-      !allowedTypes.includes(ext) ||
-      !allowedMimeTypes.includes(file.mimetype)
-    ) {
-      this.logger.error(
-        'Tipo de archivo o mimetype no permitido',
-        'EvolutionService',
-        {
-          ext,
-          mimetype: file.mimetype,
-        },
-      );
-      return {
-        status: 'error',
-        message: `Tipo de archivo no permitido: ${ext} (${file.mimetype})`,
-      };
-    }
-    try {
-      // Subir archivo a GHL
-      // Import dinámico para evitar problemas en entornos SSR
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const FormData = require('form-data');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const fetch = require('node-fetch');
-      const form = new FormData();
-      form.append('fileAttachment', file.buffer, file.originalname);
-      this.logger.log('Enviando archivo a GHL', 'EvolutionService', {
-        url: 'https://services.leadconnectorhq.com/conversations/messages/upload',
-        filename: file.originalname,
-      });
-      const ghlRes = await fetch(
-        'https://services.leadconnectorhq.com/conversations/messages/upload',
-        {
-          method: 'POST',
-          body: form,
-          headers: form.getHeaders(),
-        },
-      );
-      this.logger.log('Respuesta de GHL recibida', 'EvolutionService', {
-        status: ghlRes.status,
-      });
-      if (!ghlRes.ok) {
-        const errorText = await ghlRes.text();
-        this.logger.error('Error al subir archivo a GHL', 'EvolutionService', {
-          status: ghlRes.status,
-          errorText,
-        });
-        return {
-          status: 'error',
-          message: 'Error al subir archivo a GHL',
-        };
-      }
-      const ghlBody = await ghlRes.json();
-      this.logger.log('Body de respuesta de GHL', 'EvolutionService', {
-        ghlBody,
-      });
-      const url =
-        ghlBody?.url ||
-        ghlBody?.fileURL ||
-        ghlBody?.fileUrl ||
-        ghlBody?.Body?.url;
-      if (!url) {
-        this.logger.error(
-          'No se recibió URL del archivo desde GHL',
-          'EvolutionService',
-          { ghlBody },
-        );
-        return {
-          status: 'error',
-          message: 'No se recibió URL del archivo desde GHL',
-        };
-      }
-      this.logger.success(
-        'Archivo subido correctamente a GHL',
-        'EvolutionService',
-        { url, tipo, type },
-      );
-      // Insertar mensaje en la base de datos si extraData está presente
-      if (extraData && this.messageModel) {
-        try {
-          const messageDoc = {
-            userId: extraData.userId,
-            contactId: extraData.contactId,
-            locationId: extraData.locationId,
-            messageId: extraData.messageId || Date.now() + '-' + Math.random(),
-            type,
-            conversationId: extraData.conversationId,
-            phone: extraData.phone,
-            message: extraData.message || tipo,
-            attachments: [{ url, type }],
-          };
-          await this.messageModel.create(messageDoc);
-          this.logger.success(
-            'Mensaje con archivo insertado en MongoDB',
-            'EvolutionService',
-            { messageDoc },
-          );
-        } catch (err) {
-          this.logger.error(
-            'Error al insertar mensaje en MongoDB',
-            'EvolutionService',
-            { error: err?.message },
-          );
-        }
-      }
-      return {
-        status: 'success',
-        message: tipo,
-        url,
-        type,
-      };
-    } catch (err) {
-      this.logger.error(
-        'Excepción al subir archivo a GHL',
-        'EvolutionService',
-        {
-          error: err?.message,
-          stack: err?.stack,
-        },
-      );
-      return {
-        status: 'error',
-        message: 'Excepción al subir archivo a GHL',
-      };
-    }
   }
 
   async sendAudio(audio: string, instanceName: string): Promise<any> {
@@ -814,20 +607,16 @@ export class EvolutionService {
 
     // Preestablecer eventos si no se pasan
     const defaultEvents = [
-      'CHATS_SET',
-      'CHATS_UPDATE',
-      'CHATS_UPSERT',
-      'MESSAGES_DELETE',
-      'MESSAGES_SET',
-      'MESSAGES_UPDATE',
-      'MESSAGES_UPSERT',
-      'SEND_MESSAGE',
+      "CHATS_SET",
+      "CHATS_UPDATE",
+      "CHATS_UPSERT",
+      "MESSAGES_DELETE",
+      "MESSAGES_SET",
+      "MESSAGES_UPDATE",
+      "MESSAGES_UPSERT",
+      "SEND_MESSAGE"
     ];
-    if (
-      !websocketConfig.events ||
-      !Array.isArray(websocketConfig.events) ||
-      websocketConfig.events.length === 0
-    ) {
+    if (!websocketConfig.events || !Array.isArray(websocketConfig.events) || websocketConfig.events.length === 0) {
       websocketConfig.events = defaultEvents;
     }
 
@@ -862,13 +651,8 @@ export class EvolutionService {
       );
 
       // Guardar hasWebSocket en la instancia correspondiente
-      const user =
-        await this.userService.findOneByEvolutionInstanceName(instanceName);
-      if (
-        user &&
-        user.evolutionInstances &&
-        Array.isArray(user.evolutionInstances)
-      ) {
+      const user = await this.userService.findOneByEvolutionInstanceName(instanceName);
+      if (user && user.evolutionInstances && Array.isArray(user.evolutionInstances)) {
         const updatedInstances = user.evolutionInstances.map((instance) => {
           if (
             instance.name === instanceName ||
@@ -882,10 +666,7 @@ export class EvolutionService {
           }
           return instance;
         });
-        await this.userService.setUserEvolutionInstances(
-          user.id.toString(),
-          updatedInstances,
-        );
+        await this.userService.setUserEvolutionInstances(user.id.toString(), updatedInstances);
 
         // Lógica para uwebsockets
         if (typeof websocketConfig.enabled === 'boolean') {
@@ -899,7 +680,7 @@ export class EvolutionService {
                 enabled: true,
                 events: websocketConfig.events || [],
               },
-              { upsert: true, new: true },
+              { upsert: true, new: true }
             );
           } else {
             // Eliminar el uwebsocket

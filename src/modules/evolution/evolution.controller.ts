@@ -1,144 +1,131 @@
 import {
   Controller,
   Post,
-  UseInterceptors,
-  UploadedFile,
   Body,
-  BadRequestException,
   Res,
-  Param,
-  Get,
-  Put,
-  Delete,
-  UseGuards,
   HttpStatus,
-  Inject,
-  forwardRef,
+  Get,
+  Delete,
+  Param,
+  Query,
+  UseGuards,
+  Put,
 } from '@nestjs/common';
 import {
+  ApiTags,
   ApiOperation,
   ApiParam,
   ApiBody,
+  ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { UserData } from '../../common/decorators/user.decorator';
-// ...otros imports necesarios...
-
-import { LoggerService } from '../../common/services/logger.service';
 import { EvolutionService } from './evolution.service';
 import { UserService } from '../user/user.service';
+import { AuthGuard } from '../auth/auth.guard';
+import { UserData } from '../../common/decorators/user.decorator';
+import { LoggerService } from '../../common/services/logger.service';
 import {
-  SetWebSocketConfigDto,
+  UpdateInstanceSettingsDto,
   ToggleAlwaysOnlineDto,
+  ToggleRejectCallDto,
   ToggleGroupsIgnoreDto,
   ToggleReadMessagesDto,
   ToggleReadStatusDto,
-  ToggleRejectCallDto,
   ToggleSyncFullHistoryDto,
-  UpdateInstanceSettingsDto,
+  SetWebSocketConfigDto,
 } from './dto/instance-settings.dto';
 
+@ApiTags('evolution')
 @Controller('evolution')
 export class EvolutionController {
   constructor(
-    private readonly loggerService: LoggerService,
     private readonly evolutionService: EvolutionService,
-    @Inject(forwardRef(() => UserService))
     private readonly userService: UserService,
+    private readonly loggerService: LoggerService,
   ) {}
 
+  @Get('qr')
+  @ApiOperation({ summary: 'Obtener QR de la instancia' })
+  async getInstanceQr(
+    @Query('instanceName') instanceName: string,
+    @Query('number') number: string,
+  ): Promise<any> {
+    try {
+      this.loggerService.log(
+        'Solicitud de QR recibida',
+        'EvolutionController',
+        { instanceName, number },
+      );
+
+      const qr = await this.evolutionService.getInstanceQr(
+        instanceName,
+        number,
+      );
+
+      this.loggerService.success(
+        'QR obtenido exitosamente',
+        'EvolutionController',
+        { instanceName, number },
+      );
+
+      return {
+        status: 'success',
+        message: 'QR obtenido exitosamente',
+        data: qr,
+      };
+    } catch (error) {
+      this.loggerService.error('Error al obtener QR', 'EvolutionController', {
+        instanceName,
+        number,
+        error: error.message,
+      });
+      return {
+        status: 'error',
+        message: `Error al obtener QR: ${error.message}`,
+      };
+    }
+  }
+
   @Post('message')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseGuards(AuthGuard)
   async sendMessage(
-    @UploadedFile() file: any,
     @Body('conversationId') conversationId: string,
     @Body('message') message: string,
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
     @UserData() userData: any,
-  ): Promise<{
-    status: string;
-    message: string;
-    attachments?: { url: string; type: string }[];
-  }> {
-    if (!contact || !contact.phone) {
-      throw new BadRequestException(
-        'El contacto y su teléfono son obligatorios',
-      );
-    }
+  ): Promise<{ status: string; message: string }> {
     const numberTarget = contact.phone.replace('+', '');
+
     try {
-      if (file) {
-        // Pasar los datos necesarios para guardar el mensaje en MongoDB
-        const uploadResult = await this.evolutionService.uploadFileToGHL(file, {
+      this.loggerService.log(
+        'Enviando mensaje via Evolution API',
+        'EvolutionController',
+        {
+          conversationId,
+          numberTarget,
           userId: userData.id,
-          contactId: contact.id,
-          locationId: locationId,
-          messageId: undefined, // puedes generar uno si lo necesitas
-          conversationId: conversationId,
-          phone: numberTarget,
-          message: message,
-        });
-        if (uploadResult.status !== 'success') {
-          return uploadResult;
-        }
-        // También puedes enviar el archivo a Evolution si es necesario
-        await this.evolutionService.sendMessageToEvolution(
-          uploadResult.type === 'image'
-            ? 'image'
-            : uploadResult.type === 'audio'
-              ? 'audio'
-              : 'text',
-          numberTarget,
-          uploadResult.url || '',
-          userData.id,
-        );
-        return {
-          status: 'success',
-          message: uploadResult.message,
-          attachments: [
-            {
-              url: uploadResult.url || '',
-              type: uploadResult.type || '',
-            },
-          ],
-        };
-      } else if (message && typeof message === 'string') {
-        this.loggerService.log(
-          'Enviando mensaje via Evolution API',
-          'EvolutionController',
-          {
-            conversationId,
-            numberTarget,
-            userId: userData.id,
-            locationId: userData.locationId,
-          },
-        );
-        await this.evolutionService.sendMessageToEvolution(
-          'text',
-          numberTarget,
-          message,
-          userData.id,
-        );
-        this.loggerService.success(
-          'Mensaje enviado exitosamente via Evolution API',
-          'EvolutionController',
-          { conversationId, numberTarget, userId: userData.id },
-        );
-        return {
-          status: 'success',
-          message: 'Mensaje enviado a Evolution API',
-        };
-      } else {
-        return {
-          status: 'error',
-          message: 'Debe enviar un mensaje de texto o un archivo válido',
-        };
-      }
+          locationId: userData.locationId,
+        },
+      );
+
+      await this.evolutionService.sendMessageToEvolution(
+        'text',
+        numberTarget,
+        message,
+        userData.id,
+      );
+
+      this.loggerService.success(
+        'Mensaje enviado exitosamente via Evolution API',
+        'EvolutionController',
+        { conversationId, numberTarget, userId: userData.id },
+      );
+
+      return { status: 'success', message: 'Mensaje enviado a Evolution API' };
     } catch (error) {
       this.loggerService.error(
-        'Error al enviar mensaje o archivo via Evolution API',
+        'Error al enviar mensaje via Evolution API',
         'EvolutionController',
         {
           conversationId,
@@ -149,7 +136,7 @@ export class EvolutionController {
       );
       return {
         status: 'error',
-        message: 'Error al procesar mensaje o archivo',
+        message: 'Número inválido o error al contactar Evolution API',
       };
     }
   }
@@ -552,6 +539,7 @@ export class EvolutionController {
   }
 
   @Post('instance/:instanceName/websocket')
+  @UseGuards(AuthGuard)
   @ApiOperation({
     summary: 'Configurar WebSocket para instancia',
     description:
