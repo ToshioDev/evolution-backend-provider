@@ -9,6 +9,7 @@ import { MessageService } from './message.service';
 import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';
 import axios from 'axios';
+import { extname } from 'path';
 
 @Controller('message')
 export class MessageController {
@@ -42,82 +43,105 @@ export class MessageController {
         'mp3',
         'wav',
       ];
-      const extensionToMime: Record<string, string> = {
-        jpg: 'image/jpeg',
-        jpeg: 'image/jpeg',
-        png: 'image/png',
-        mp4: 'video/mp4',
-        mpeg: 'video/mpeg',
-        zip: 'application/zip',
-        rar: 'application/vnd.rar',
-        pdf: 'application/pdf',
-        doc: 'application/msword',
-        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        txt: 'text/plain',
-        mp3: 'audio/mpeg',
-        wav: 'audio/wav',
+      const extensionToType: Record<string, string> = {
+        jpg: 'image',
+        jpeg: 'image',
+        png: 'image',
+        mp4: 'video',
+        mpeg: 'video',
+        zip: 'archive',
+        rar: 'archive',
+        pdf: 'pdf',
+        doc: 'word',
+        docx: 'word',
+        txt: 'text',
+        mp3: 'audio',
+        wav: 'audio',
       };
 
-      // Normalizar attachments: siempre debe ser array de objetos {type, data}
+      // Validar y subir archivos permitidos a GoHighLevel, guardar el link y type
+      let attachments: any[] = [];
       if (
         Array.isArray(createMessageDto.attachments) &&
         createMessageDto.attachments.length > 0
       ) {
-        createMessageDto.attachments = createMessageDto.attachments.map(
-          (att: any) => {
-            let url = att;
-            if (typeof att === 'object' && att.data) url = att.data;
-            if (typeof att === 'object' && att.type && att.data) return att;
-            const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
-            const ext = extMatch ? extMatch[1].toLowerCase() : '';
-            // type simple para front: image, audio, video, pdf, word, excel, archive, text, file
-            let type = 'file';
-            if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
-              type = 'image';
-            else if (['mp3', 'wav', 'ogg', 'aac'].includes(ext)) type = 'audio';
-            else if (
-              ['mp4', 'mpeg', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(ext)
-            )
-              type = 'video';
-            else if (ext === 'pdf') type = 'pdf';
-            else if (['doc', 'docx'].includes(ext)) type = 'word';
-            else if (['xls', 'xlsx'].includes(ext)) type = 'excel';
-            else if (['zip', 'rar'].includes(ext)) type = 'archive';
-            else if (ext === 'txt') type = 'text';
-            return { type, data: url };
-          },
-        );
-      }
-      // Imprimir para depuración
-      console.log(
-        '[DEBUG] attachments normalizados:',
-        createMessageDto.attachments,
-      );
-
-      // Detectar si es archivo válido
-      if (
-        Array.isArray(createMessageDto.attachments) &&
-        createMessageDto.attachments.length > 0
-      ) {
-        fileAttachment = createMessageDto.attachments[0];
-        if (fileAttachment && fileAttachment.mimetype) {
-          const ext = Object.keys(extensionToMime).find(
-            (key) => extensionToMime[key] === fileAttachment.mimetype,
+        for (const att of createMessageDto.attachments) {
+          let url = typeof att === 'string' ? att : att.data;
+          const ext = extname(url || '')
+            .replace('.', '')
+            .toLowerCase();
+          if (!allowedExtensions.includes(ext)) {
+            throw new HttpException(
+              'Tipo de archivo no permitido: ' + ext,
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+          isFile = true;
+          fileType = extensionToType[ext] || 'file';
+          // Descargar el archivo como buffer
+          const response = await axios.get(url, {
+            responseType: 'arraybuffer',
+          });
+          const fileBuffer = Buffer.from(response.data);
+          // Subir a GoHighLevel
+          const FormData = require('form-data');
+          const form = new FormData();
+          form.append('fileAttachment', fileBuffer, 'archivo.' + ext);
+          form.append('conversationId', createMessageDto.conversationId || '');
+          form.append('locationId', createMessageDto.locationId || '');
+          // Buscar token de GoHighLevel
+          const user = await this.userService.findByLocationId(
+            createMessageDto.locationId || '1',
           );
-          if (ext && allowedExtensions.includes(ext)) {
-            isFile = true;
-            fileType = fileAttachment.mimetype;
+          const accessToken = user?.ghlAuth?.access_token;
+          if (!accessToken) {
+            throw new HttpException(
+              'No se encontró el token de GoHighLevel para este usuario',
+              HttpStatus.UNAUTHORIZED,
+            );
           }
-        } else if (fileAttachment && fileAttachment.data) {
-          const url = fileAttachment.data;
-          const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
-          const ext = extMatch ? extMatch[1].toLowerCase() : '';
-          if (allowedExtensions.includes(ext)) {
-            isFile = true;
-            fileType = extensionToMime[ext] || 'application/octet-stream';
+          let uploadResponse;
+          try {
+            uploadResponse = await axios.post(
+              'https://services.leadconnectorhq.com/conversations/messages/upload',
+              form,
+              {
+                headers: {
+                  ...form.getHeaders(),
+                  Accept: 'application/json',
+                  Version: '2021-04-15',
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+              },
+            );
+          } catch (uploadError) {
+            console.error(
+              'Error subiendo archivo a GoHighLevel:',
+              'MessageController',
+              uploadError.message,
+            );
+            throw new HttpException(
+              'Error subiendo archivo a GoHighLevel: ' + uploadError.message,
+              HttpStatus.BAD_REQUEST,
+            );
           }
+          const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
+          if (!attachmentUrls[0]) {
+            throw new HttpException(
+              'No se obtuvo URL de GoHighLevel',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+          attachments.push({
+            type: fileType,
+            data: attachmentUrls[0],
+          });
         }
       }
+      // Imprimir para depuración
+      console.log('[DEBUG] attachments normalizados:', attachments);
 
       // Validar mensaje de texto si no es archivo
       if (!isFile) {
@@ -132,120 +156,34 @@ export class MessageController {
         }
       }
 
-      // Guardar el mensaje en la base de datos
-      if (isFile) {
-        // Subir archivo a GoHighLevel y guardar la URL
-        const FormData = require('form-data');
-        const form = new FormData();
-        let fileBuffer = fileAttachment.buffer;
-        let fileName =
-          fileAttachment.originalname || fileAttachment.filename || 'archivo';
-        if (!fileBuffer && fileAttachment.base64) {
-          fileBuffer = Buffer.from(fileAttachment.base64, 'base64');
-        }
-        form.append('fileAttachment', fileBuffer, fileName);
-        form.append('conversationId', createMessageDto.conversationId || '');
-        form.append('locationId', createMessageDto.locationId || '');
-
-        // Buscar token de GoHighLevel
-        const user = await this.userService.findByLocationId(
-          createMessageDto.locationId || '1',
+      // Guardar el mensaje en la base de datos y enviar a Evolution
+      if (isFile && attachments.length > 0) {
+        // Guarda en Mongo el link y type
+        message = await this.messageService.create({
+          ...createMessageDto,
+          message: '',
+          attachments,
+          type: attachments[0].type,
+        });
+        // Enviar a Evolution el link (no base64)
+        await this.evolutionService.sendMessageToEvolution(
+          attachments[0].type,
+          createMessageDto.phone,
+          attachments[0].data,
+          createMessageDto.userId,
         );
-        const accessToken = user?.ghlAuth?.access_token;
-        if (!accessToken) {
-          throw new HttpException(
-            'No se encontró el token de GoHighLevel para este usuario',
-            HttpStatus.UNAUTHORIZED,
-          );
-        }
-
-        let uploadResponse;
-        try {
-          uploadResponse = await axios.post(
-            'https://services.leadconnectorhq.com/conversations/messages/upload',
-            form,
-            {
-              headers: {
-                ...form.getHeaders(),
-                Accept: 'application/json',
-                Version: '2021-04-15',
-                Authorization: `Bearer ${accessToken}`,
-              },
-              maxContentLength: Infinity,
-              maxBodyLength: Infinity,
-            },
-          );
-        } catch (uploadError) {
-          console.error(
-            'Error subiendo archivo a GoHighLevel:',
-            'MessageController',
-            uploadError.message,
-          );
-          throw new HttpException(
-            'Error subiendo archivo a GoHighLevel: ' + uploadError.message,
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
-        const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
-        // type simple para front
-        let ext = '';
-        if (attachmentUrls[0]) {
-          const extMatch = attachmentUrls[0].match(/\.([a-zA-Z0-9]+)$/);
-          ext = extMatch ? extMatch[1].toLowerCase() : '';
-        }
-        let type = 'file';
-        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
-          type = 'image';
-        else if (['mp3', 'wav', 'ogg', 'aac'].includes(ext)) type = 'audio';
-        else if (
-          ['mp4', 'mpeg', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(ext)
-        )
-          type = 'video';
-        else if (ext === 'pdf') type = 'pdf';
-        else if (['doc', 'docx'].includes(ext)) type = 'word';
-        else if (['xls', 'xlsx'].includes(ext)) type = 'excel';
-        else if (['zip', 'rar'].includes(ext)) type = 'archive';
-        else if (ext === 'txt') type = 'text';
-
-        uploadedAttachment = {
-          type,
-          data: attachmentUrls[0] || '',
-        };
-        // Definir el tipo de mensaje para Mongo
-        let mongoType = type;
-
-        // Asegurar que messageId esté presente
-        const mongoMessageId =
-          createMessageDto.messageId ||
-          `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-
-        message = await this.messageService.create({
-          ...createMessageDto,
-          message: fileName,
-          attachments: [uploadedAttachment],
-          type: mongoType,
-          messageId: mongoMessageId,
-        });
-      } else if (
-        Array.isArray(createMessageDto.attachments) &&
-        createMessageDto.attachments.length > 0 &&
-        typeof createMessageDto.attachments[0] === 'object' &&
-        createMessageDto.attachments[0] !== null &&
-        'type' in createMessageDto.attachments[0]
-      ) {
-        // attachments ya normalizados arriba
-        message = await this.messageService.create({
-          ...createMessageDto,
-          attachments: createMessageDto.attachments,
-          type: createMessageDto.attachments[0].type || 'file',
-        });
       } else {
         // Mensaje de texto normal
         message = await this.messageService.create({
           ...createMessageDto,
           type: 'text',
         });
+        await this.evolutionService.sendMessageToEvolution(
+          'text',
+          createMessageDto.phone,
+          createMessageDto.message,
+          createMessageDto.userId,
+        );
       }
 
       // Buscar usuario y enviar mensaje a Evolution
