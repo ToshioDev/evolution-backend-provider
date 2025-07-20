@@ -181,7 +181,14 @@ export class MessageController {
       }
 
       // Guardar el mensaje en la base de datos
-      if (isFile && attachments.length > 0) {
+      if (
+        isFile &&
+        Array.isArray(attachments) &&
+        attachments.length > 0 &&
+        attachments[0] &&
+        attachments[0].type &&
+        attachments[0].data
+      ) {
         // Asegurar que messageId esté presente
         const mongoMessageId =
           createMessageDto.messageId ||
@@ -198,8 +205,10 @@ export class MessageController {
         // Mensaje de texto normal
         message = await this.messageService.create({
           ...createMessageDto,
+          attachments: [],
           type: 'text',
         });
+        uploadedAttachment = null;
       }
 
       // Buscar usuario y enviar mensaje a Evolution
@@ -269,10 +278,7 @@ export class MessageController {
         status: 200,
         data: {
           userId: createMessageDto.userId,
-          attachments:
-            isFile && uploadedAttachment
-              ? [uploadedAttachment]
-              : createMessageDto.attachments,
+          attachments: isFile && uploadedAttachment ? [uploadedAttachment] : [],
           contactId: createMessageDto.contactId,
           locationId: createMessageDto.locationId,
           messageId: message.messageId,
