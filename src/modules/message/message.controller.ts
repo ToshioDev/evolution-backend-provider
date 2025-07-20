@@ -216,13 +216,16 @@ export class MessageController {
         });
       } else if (
         Array.isArray(createMessageDto.attachments) &&
-        createMessageDto.attachments.length > 0
+        createMessageDto.attachments.length > 0 &&
+        typeof createMessageDto.attachments[0] === 'object' &&
+        createMessageDto.attachments[0] !== null &&
+        'type' in createMessageDto.attachments[0]
       ) {
         // attachments ya normalizados arriba
         message = await this.messageService.create({
           ...createMessageDto,
           attachments: createMessageDto.attachments,
-          type: createMessageDto.attachments[0]?.type || 'file',
+          type: createMessageDto.attachments[0].type || 'file',
         });
       } else {
         // Mensaje de texto normal
