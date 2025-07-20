@@ -10,7 +10,6 @@ import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';
 import axios from 'axios';
 import { extname } from 'path';
-import { Types } from 'mongoose';
 
 @Controller('message')
 export class MessageController {
@@ -24,25 +23,9 @@ export class MessageController {
   async create(@Body() createMessageDto: any) {
     this.messageService.logIncomingMessageBody(createMessageDto);
     try {
-      // Normalizar userId a ObjectId si es posible
-      let userId = createMessageDto.userId;
-      let user: any = null;
-      if (userId && Types.ObjectId.isValid(userId)) {
-        user = await this.userService.findById(userId);
-      } else if (createMessageDto.locationId) {
-        user = await this.userService.findByLocationId(
-          createMessageDto.locationId,
-        );
-        if (user && user._id) userId = user._id.toString();
-      }
-      if (!user) {
-        throw new HttpException(
-          'Usuario no encontrado para userId o locationId',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
       let isFile = false;
       let fileType = '';
+      let fileAttachment: any = null;
       let uploadedAttachment: any = null;
       let message;
       const allowedExtensions = [
@@ -60,97 +43,48 @@ export class MessageController {
         'mp3',
         'wav',
       ];
-      const extensionToType: Record<string, string> = {
-        jpg: 'image',
-        jpeg: 'image',
-        png: 'image',
-        mp4: 'video',
-        mpeg: 'video',
-        zip: 'archive',
-        rar: 'archive',
-        pdf: 'pdf',
-        doc: 'word',
-        docx: 'word',
-        txt: 'text',
-        mp3: 'audio',
-        wav: 'audio',
+      const extensionToMime: Record<string, string> = {
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        mp4: 'video/mp4',
+        mpeg: 'video/mpeg',
+        zip: 'application/zip',
+        rar: 'application/vnd.rar',
+        pdf: 'application/pdf',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        txt: 'text/plain',
+        mp3: 'audio/mpeg',
+        wav: 'audio/wav',
       };
 
-      // Validar y subir archivos permitidos a GoHighLevel, guardar el link y type
+      // Normalizar y convertir attachments a {type, data: base64} si es archivo permitido
       let attachments: any[] = [];
-      if (
-        Array.isArray(createMessageDto.attachments) &&
-        createMessageDto.attachments.length > 0
-      ) {
+      let base64Data = '';
+      if (Array.isArray(createMessageDto.attachments) && createMessageDto.attachments.length > 0) {
         for (const att of createMessageDto.attachments) {
           let url = typeof att === 'string' ? att : att.data;
-          const ext = extname(url || '')
-            .replace('.', '')
-            .toLowerCase();
-          if (!allowedExtensions.includes(ext)) {
-            throw new HttpException(
-              'Tipo de archivo no permitido: ' + ext,
-              HttpStatus.BAD_REQUEST,
-            );
+          const ext = extname(url || '').replace('.', '').toLowerCase();
+          if (allowedExtensions.includes(ext)) {
+            isFile = true;
+            fileType = extensionToMime[ext] || 'application/octet-stream';
+            // Descargar y convertir a base64
+            const response = await axios.get(url, { responseType: 'arraybuffer' });
+            base64Data = Buffer.from(response.data).toString('base64');
+            attachments.push({
+              type: ext === 'jpg' || ext === 'jpeg' || ext === 'png' ? 'image' :
+                    ext === 'mp3' || ext === 'wav' ? 'audio' :
+                    ext === 'mp4' || ext === 'mpeg' ? 'video' :
+                    ext === 'pdf' ? 'pdf' :
+                    ext === 'doc' || ext === 'docx' ? 'word' :
+                    ext === 'zip' || ext === 'rar' ? 'archive' :
+                    ext === 'txt' ? 'text' : 'file',
+              data: base64Data,
+            });
+          } else if (typeof att === 'object' && att.type && att.data) {
+            attachments.push(att);
           }
-          isFile = true;
-          fileType = extensionToType[ext] || 'file';
-          // Descargar el archivo como buffer
-          const response = await axios.get(url, {
-            responseType: 'arraybuffer',
-          });
-          const fileBuffer = Buffer.from(response.data);
-          // Subir a GoHighLevel
-          const FormData = require('form-data');
-          const form = new FormData();
-          form.append('fileAttachment', fileBuffer, 'archivo.' + ext);
-          form.append('conversationId', createMessageDto.conversationId || '');
-          form.append('locationId', createMessageDto.locationId || '');
-          const accessToken = user?.ghlAuth?.access_token;
-          if (!accessToken) {
-            throw new HttpException(
-              'No se encontró el token de GoHighLevel para este usuario',
-              HttpStatus.UNAUTHORIZED,
-            );
-          }
-          let uploadResponse;
-          try {
-            uploadResponse = await axios.post(
-              'https://services.leadconnectorhq.com/conversations/messages/upload',
-              form,
-              {
-                headers: {
-                  ...form.getHeaders(),
-                  Accept: 'application/json',
-                  Version: '2021-04-15',
-                  Authorization: `Bearer ${accessToken}`,
-                },
-                maxContentLength: Infinity,
-                maxBodyLength: Infinity,
-              },
-            );
-          } catch (uploadError) {
-            console.error(
-              'Error subiendo archivo a GoHighLevel:',
-              'MessageController',
-              uploadError.message,
-            );
-            throw new HttpException(
-              'Error subiendo archivo a GoHighLevel: ' + uploadError.message,
-              HttpStatus.BAD_REQUEST,
-            );
-          }
-          const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
-          if (!attachmentUrls[0]) {
-            throw new HttpException(
-              'No se obtuvo URL de GoHighLevel',
-              HttpStatus.BAD_REQUEST,
-            );
-          }
-          attachments.push({
-            type: fileType,
-            data: attachmentUrls[0],
-          });
         }
       }
       // Imprimir para depuración
@@ -158,32 +92,39 @@ export class MessageController {
 
       // Validar mensaje de texto si no es archivo
       if (!isFile) {
-        if (
-          !createMessageDto.message ||
-          createMessageDto.message.trim() === ''
-        ) {
-          throw new HttpException(
-            'El mensaje no puede estar vacío',
-            HttpStatus.BAD_REQUEST,
-          );
+        if (!createMessageDto.message || createMessageDto.message.trim() === '') {
+          throw new HttpException('El mensaje no puede estar vacío', HttpStatus.BAD_REQUEST);
         }
       }
 
       // Guardar el mensaje en la base de datos y enviar a Evolution
       if (isFile && attachments.length > 0) {
-        // Guarda en Mongo el link y type
+        // Guarda en Mongo el base64
         message = await this.messageService.create({
           ...createMessageDto,
           message: '',
           attachments,
           type: attachments[0].type,
         });
-        // Enviar a Evolution el link (no base64)
+        // Enviar a Evolution el base64
         await this.evolutionService.sendMessageToEvolution(
           attachments[0].type,
           createMessageDto.phone,
           attachments[0].data,
-          userId,
+          createMessageDto.userId,
+        );
+      } else if (Array.isArray(attachments) && attachments.length > 0 && typeof attachments[0] === 'object' && attachments[0] !== null && 'type' in attachments[0]) {
+        // attachments ya normalizados arriba
+        message = await this.messageService.create({
+          ...createMessageDto,
+          attachments,
+          type: attachments[0].type || 'file',
+        });
+        await this.evolutionService.sendMessageToEvolution(
+          attachments[0].type,
+          createMessageDto.phone,
+          attachments[0].data,
+          createMessageDto.userId,
         );
       } else {
         // Mensaje de texto normal
@@ -195,11 +136,45 @@ export class MessageController {
           'text',
           createMessageDto.phone,
           createMessageDto.message,
-          userId,
+          createMessageDto.userId,
         );
       }
 
-      // Ya no se hace doble envío a Evolution ni doble búsqueda de usuario
+      // Buscar usuario y enviar mensaje a Evolution
+      const user = await this.userService.findByLocationId(
+        createMessageDto.locationId || '1',
+      );
+      try {
+        const remoteJid = (createMessageDto.phone || '').replace('+', '');
+        const userId =
+          user && (user as any)._id ? (user as any)._id.toString() : '';
+        if (isFile) {
+          let evolutionType: 'image' | 'audio' | 'text' = 'text';
+          if (fileType.startsWith('image')) evolutionType = 'image';
+          else if (fileType.startsWith('audio')) evolutionType = 'audio';
+          else if (fileType.startsWith('video')) evolutionType = 'image';
+          else evolutionType = 'image';
+          await this.evolutionService.sendMessageToEvolution(
+            evolutionType,
+            remoteJid,
+            uploadedAttachment?.data || '',
+            userId,
+          );
+        } else {
+          await this.evolutionService.sendMessageToEvolution(
+            'text',
+            remoteJid,
+            createMessageDto.message || '',
+            userId,
+          );
+        }
+      } catch (evoError) {
+        console.error(
+          '[ERROR] Error sending message via EvolutionService:',
+          'MessageController',
+          evoError.message,
+        );
+      }
 
       // Actualizar status en GoHighLevel si corresponde
       if (user && user.ghlAuth && user.ghlAuth.access_token) {
