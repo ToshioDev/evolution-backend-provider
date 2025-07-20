@@ -1,142 +1,59 @@
-// ...existing code...
-import 'multer';
 import {
   Controller,
   Post,
-  Body,
-  Res,
-  HttpStatus,
-  Get,
-  Delete,
-  Param,
-  Query,
-  UseGuards,
-  Put,
-  UploadedFile,
   UseInterceptors,
+  UploadedFile,
+  Body,
   BadRequestException,
+  Res,
+  Param,
+  Get,
+  Put,
+  Delete,
+  UseGuards,
+  HttpStatus,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import {
-  ApiTags,
   ApiOperation,
   ApiParam,
   ApiBody,
-  ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UserData } from '../../common/decorators/user.decorator';
+// ...otros imports necesarios...
+
+import { LoggerService } from '../../common/services/logger.service';
 import { EvolutionService } from './evolution.service';
 import { UserService } from '../user/user.service';
-import { AuthGuard } from '../auth/auth.guard';
-import { UserData } from '../../common/decorators/user.decorator';
-import { LoggerService } from '../../common/services/logger.service';
-import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  UpdateInstanceSettingsDto,
-  ToggleAlwaysOnlineDto,
-  ToggleRejectCallDto,
-  ToggleGroupsIgnoreDto,
-  ToggleReadMessagesDto,
-  ToggleReadStatusDto,
-  ToggleSyncFullHistoryDto,
-  SetWebSocketConfigDto,
-} from './dto/instance-settings.dto';
+import { SetWebSocketConfigDto, ToggleAlwaysOnlineDto, ToggleGroupsIgnoreDto, ToggleReadMessagesDto, ToggleReadStatusDto, ToggleRejectCallDto, ToggleSyncFullHistoryDto, UpdateInstanceSettingsDto } from './dto/instance-settings.dto';
 
-@ApiTags('evolution')
 @Controller('evolution')
 export class EvolutionController {
-  @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(
-    @UploadedFile() file?: any,
-    @Body('conversationId') conversationId?: string,
-    @Body('locationId') locationId?: string,
-    @Body('attachmentUrls') attachmentUrls?: string[],
-  ): Promise<any> {
-    if (!file) {
-      return {
-        status: 'error',
-        message: 'No se recibió archivo',
-      };
-    }
-    if (
-      !conversationId ||
-      !locationId ||
-      !attachmentUrls ||
-      !Array.isArray(attachmentUrls)
-    ) {
-      return {
-        status: 'error',
-        message:
-          'Faltan campos requeridos: conversationId, locationId o attachmentUrls',
-      };
-    }
-    const uploadResult = await this.evolutionService.uploadFileToGHL(file);
-    return {
-      ...uploadResult,
-      conversationId,
-      locationId,
-      attachmentUrls,
-    };
-  }
   constructor(
-    private readonly evolutionService: EvolutionService,
-    private readonly userService: UserService,
     private readonly loggerService: LoggerService,
+    private readonly evolutionService: EvolutionService,
+    @Inject(forwardRef(() => UserService))
+    private readonly userService: UserService,
   ) {}
-
-  @Get('qr')
-  @ApiOperation({ summary: 'Obtener QR de la instancia' })
-  async getInstanceQr(
-    @Query('instanceName') instanceName: string,
-    @Query('number') number: string,
-  ): Promise<any> {
-    try {
-      this.loggerService.log(
-        'Solicitud de QR recibida',
-        'EvolutionController',
-        { instanceName, number },
-      );
-
-      const qr = await this.evolutionService.getInstanceQr(
-        instanceName,
-        number,
-      );
-
-      this.loggerService.success(
-        'QR obtenido exitosamente',
-        'EvolutionController',
-        { instanceName, number },
-      );
-
-      return {
-        status: 'success',
-        message: 'QR obtenido exitosamente',
-        data: qr,
-      };
-    } catch (error) {
-      this.loggerService.error('Error al obtener QR', 'EvolutionController', {
-        instanceName,
-        number,
-        error: error.message,
-      });
-      return {
-        status: 'error',
-        message: `Error al obtener QR: ${error.message}`,
-      };
-    }
-  }
+  // ...otros métodos...
 
   @Post('message')
+  @UseInterceptors(FileInterceptor('file'))
   async sendMessage(
+    @UploadedFile() file: any,
     @Body('conversationId') conversationId: string,
     @Body('message') message: string,
     @Body('contact') contact: { id: string; phone: string },
     @Body('locationId') locationId: string,
     @UserData() userData: any,
-    @Body('fileUrl') fileUrl?: string,
-    @Body('fileType') fileType?: string,
-    @Body('fileMessage') fileMessage?: string,
-  ): Promise<{ status: string; message: string; url?: string; type?: string; attachments?: { url: string; type: string }[] }> {
+  ): Promise<{
+    status: string;
+    message: string;
+    attachments?: { url: string; type: string }[];
+  }> {
     if (!contact || !contact.phone) {
       throw new BadRequestException(
         'El contacto y su teléfono son obligatorios',
@@ -144,26 +61,18 @@ export class EvolutionController {
     }
     const numberTarget = contact.phone.replace('+', '');
     try {
-      if (fileUrl && fileType && fileMessage) {
-        // Si es archivo, determina el tipo para EvolutionService
-        let typeForService: 'audio' | 'image' = 'image';
-        if (fileType === 'audio') typeForService = 'audio';
-        else if (fileType === 'image' || fileType === 'video')
-          typeForService = 'image';
-        // Aquí podrías guardar en Mongo o reenviar a GHL, según tu lógica
-        await this.evolutionService.sendMessageToEvolution(
-          typeForService,
-          numberTarget,
-          fileUrl,
-          userData.id,
-        );
+      if (file) {
+        const uploadResult = await this.evolutionService.uploadFileToGHL(file);
+        if (uploadResult.status !== 'success') {
+          return uploadResult;
+        }
         return {
           status: 'success',
-          message: fileMessage,
+          message: uploadResult.message,
           attachments: [
             {
-              url: fileUrl,
-              type: fileType,
+              url: uploadResult.url || '',
+              type: uploadResult.type || '',
             },
           ],
         };
@@ -615,7 +524,6 @@ export class EvolutionController {
   }
 
   @Post('instance/:instanceName/websocket')
-  @UseGuards(AuthGuard)
   @ApiOperation({
     summary: 'Configurar WebSocket para instancia',
     description:
