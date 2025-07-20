@@ -70,11 +70,20 @@ export class EvolutionController {
     const numberTarget = contact.phone.replace('+', '');
     try {
       if (file) {
-        const uploadResult = await this.evolutionService.uploadFileToGHL(file);
+        // Pasar los datos necesarios para guardar el mensaje en MongoDB
+        const uploadResult = await this.evolutionService.uploadFileToGHL(file, {
+          userId: userData.id,
+          contactId: contact.id,
+          locationId: locationId,
+          messageId: undefined, // puedes generar uno si lo necesitas
+          conversationId: conversationId,
+          phone: numberTarget,
+          message: message,
+        });
         if (uploadResult.status !== 'success') {
           return uploadResult;
         }
-        // Guardar el mensaje en la base de datos usando sendMessageToEvolution
+        // También puedes enviar el archivo a Evolution si es necesario
         await this.evolutionService.sendMessageToEvolution(
           uploadResult.type === 'image'
             ? 'image'
