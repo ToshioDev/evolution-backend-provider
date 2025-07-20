@@ -1,13 +1,7 @@
-import {
-  Controller,
-  Post,
-  Body,
-  HttpStatus,
-  HttpException,
-} from '@nestjs/common';
-import { MessageService } from './message.service';
-import { UserService } from '../user/user.service';
-import { EvolutionService } from '../evolution/evolution.service';
+import { Controller, HttpStatus, HttpException, Body, Post } from '@nestjs/common';
+import type { MessageService } from './message.service';
+import type { UserService } from '../user/user.service';
+import type { EvolutionService } from '../evolution/evolution.service';
 import axios from 'axios';
 
 @Controller('message')
@@ -21,12 +15,14 @@ export class MessageController {
   @Post()
   async create(@Body() createMessageDto: any) {
     this.messageService.logIncomingMessageBody(createMessageDto);
+
     try {
       let isFile = false;
       let fileType = '';
       let fileAttachment: any = null;
       let uploadedAttachment: any = null;
       let message;
+
       const allowedExtensions = [
         'jpg',
         'jpeg',
@@ -42,6 +38,7 @@ export class MessageController {
         'mp3',
         'wav',
       ];
+
       const extensionToMime: Record<string, string> = {
         jpg: 'image/jpeg',
         jpeg: 'image/jpeg',
@@ -68,8 +65,10 @@ export class MessageController {
             let url = att;
             if (typeof att === 'object' && att.data) url = att.data;
             if (typeof att === 'object' && att.type && att.data) return att;
+
             const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
             const ext = extMatch ? extMatch[1].toLowerCase() : '';
+
             // type simple para front: image, audio, video, pdf, word, excel, archive, text, file
             let type = 'file';
             if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
@@ -84,11 +83,12 @@ export class MessageController {
             else if (['xls', 'xlsx'].includes(ext)) type = 'excel';
             else if (['zip', 'rar'].includes(ext)) type = 'archive';
             else if (ext === 'txt') type = 'text';
+
             return { type, data: url };
           },
         );
       }
-      // Imprimir para depuración
+
       console.log(
         '[DEBUG] attachments normalizados:',
         createMessageDto.attachments,
@@ -132,17 +132,22 @@ export class MessageController {
         }
       }
 
+      // Crear fecha actual para el mensaje
+      const currentDate = new Date();
+
       // Guardar el mensaje en la base de datos
       if (isFile) {
         // Subir archivo a GoHighLevel y guardar la URL
         const FormData = require('form-data');
         const form = new FormData();
         let fileBuffer = fileAttachment.buffer;
-        let fileName =
+        const fileName =
           fileAttachment.originalname || fileAttachment.filename || 'archivo';
+
         if (!fileBuffer && fileAttachment.base64) {
           fileBuffer = Buffer.from(fileAttachment.base64, 'base64');
         }
+
         form.append('fileAttachment', fileBuffer, fileName);
         form.append('conversationId', createMessageDto.conversationId || '');
         form.append('locationId', createMessageDto.locationId || '');
@@ -161,7 +166,7 @@ export class MessageController {
 
         let uploadResponse;
         try {
-          uploadResponse = await axios.post(
+          uploadResponse = axios.post(
             'https://services.leadconnectorhq.com/conversations/messages/upload',
             form,
             {
@@ -171,8 +176,8 @@ export class MessageController {
                 Version: '2021-04-15',
                 Authorization: `Bearer ${accessToken}`,
               },
-              maxContentLength: Infinity,
-              maxBodyLength: Infinity,
+              maxContentLength: Number.POSITIVE_INFINITY,
+              maxBodyLength: Number.POSITIVE_INFINITY,
             },
           );
         } catch (uploadError) {
@@ -188,12 +193,14 @@ export class MessageController {
         }
 
         const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
+
         // type simple para front
         let ext = '';
         if (attachmentUrls[0]) {
           const extMatch = attachmentUrls[0].match(/\.([a-zA-Z0-9]+)$/);
           ext = extMatch ? extMatch[1].toLowerCase() : '';
         }
+
         let type = 'file';
         if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
           type = 'image';
@@ -212,20 +219,22 @@ export class MessageController {
           type,
           data: attachmentUrls[0] || '',
         };
-        // Definir el tipo de mensaje para Mongo
-        let mongoType = type;
 
         // Asegurar que messageId esté presente
         const mongoMessageId =
           createMessageDto.messageId ||
           `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
-        message = await this.messageService.create({
+        // CORRECCIÓN: Crear mensaje con todos los campos necesarios
+        message = this.messageService.create({
           ...createMessageDto,
           message: fileName,
           attachments: [uploadedAttachment],
-          type: mongoType,
+          type: type, // Asegurar que el type se establezca correctamente
           messageId: mongoMessageId,
+          date: currentDate, // Agregar fecha actual
+          createdAt: currentDate, // También agregar createdAt si es necesario
+          typeMessage: createMessageDto.typeMessage || 'OUTBOUND', // Asegurar typeMessage
         });
       } else if (
         Array.isArray(createMessageDto.attachments) &&
@@ -235,16 +244,22 @@ export class MessageController {
         'type' in createMessageDto.attachments[0]
       ) {
         // attachments ya normalizados arriba
-        message = await this.messageService.create({
+        message = this.messageService.create({
           ...createMessageDto,
           attachments: createMessageDto.attachments,
           type: createMessageDto.attachments[0].type || 'file',
+          date: currentDate, // Agregar fecha actual
+          createdAt: currentDate, // También agregar createdAt si es necesario
+          typeMessage: createMessageDto.typeMessage || 'OUTBOUND', // Asegurar typeMessage
         });
       } else {
         // Mensaje de texto normal
-        message = await this.messageService.create({
+        message = this.messageService.create({
           ...createMessageDto,
-          type: 'text',
+          type: 'text', // Establecer type como text para mensajes de texto
+          date: currentDate, // Agregar fecha actual
+          createdAt: currentDate, // También agregar createdAt si es necesario
+          typeMessage: createMessageDto.typeMessage || 'OUTBOUND', // Asegurar typeMessage
         });
       }
 
@@ -252,24 +267,27 @@ export class MessageController {
       const user = await this.userService.findByLocationId(
         createMessageDto.locationId || '1',
       );
+
       try {
         const remoteJid = (createMessageDto.phone || '').replace('+', '');
         const userId =
           user && (user as any)._id ? (user as any)._id.toString() : '';
+
         if (isFile) {
           let evolutionType: 'image' | 'audio' | 'text' = 'text';
           if (fileType.startsWith('image')) evolutionType = 'image';
           else if (fileType.startsWith('audio')) evolutionType = 'audio';
           else if (fileType.startsWith('video')) evolutionType = 'image';
           else evolutionType = 'image';
-          await this.evolutionService.sendMessageToEvolution(
+
+          this.evolutionService.sendMessageToEvolution(
             evolutionType,
             remoteJid,
             uploadedAttachment?.data || '',
             userId,
           );
         } else {
-          await this.evolutionService.sendMessageToEvolution(
+          this.evolutionService.sendMessageToEvolution(
             'text',
             remoteJid,
             createMessageDto.message || '',
@@ -311,6 +329,7 @@ export class MessageController {
         }, 3000);
       }
 
+      // CORRECCIÓN: Retornar respuesta con todos los campos correctos
       return {
         status: 200,
         data: {
@@ -318,17 +337,20 @@ export class MessageController {
           attachments:
             isFile && uploadedAttachment
               ? [uploadedAttachment]
-              : createMessageDto.attachments,
+              : createMessageDto.attachments || [],
           contactId: createMessageDto.contactId,
           locationId: createMessageDto.locationId,
           messageId: message.messageId,
-          type: message.type,
+          type: message.type, // Usar el type del mensaje guardado
           conversationId: createMessageDto.conversationId,
           phone: createMessageDto.phone,
           message:
             isFile && uploadedAttachment
               ? uploadedAttachment.data
               : createMessageDto.message,
+          typeMessage: message.typeMessage || 'OUTBOUND', // Incluir typeMessage
+          date: message.date || currentDate, // Incluir fecha
+          createdAt: message.createdAt || currentDate, // Incluir createdAt
         },
         savedMessage: message,
         timestamp: new Date().toISOString(),
