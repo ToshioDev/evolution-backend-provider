@@ -6,11 +6,15 @@ import { AuthModule } from '../auth/auth.module';
 import { CommonModule } from '../../common/common.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UWebSocket, UWebSocketSchema } from '../user/uwebsocket.schema';
+import { Message, MessageSchema } from '../message/message.schema';
 
 @Module({
   imports: [
     CommonModule,
-    MongooseModule.forFeature([{ name: UWebSocket.name, schema: UWebSocketSchema }]),
+    MongooseModule.forFeature([
+      { name: UWebSocket.name, schema: UWebSocketSchema },
+      { name: Message.name, schema: MessageSchema },
+    ]),
     forwardRef(() => UserModule),
     forwardRef(() => AuthModule),
   ],
