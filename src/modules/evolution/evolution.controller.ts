@@ -28,7 +28,16 @@ import { UserData } from '../../common/decorators/user.decorator';
 import { LoggerService } from '../../common/services/logger.service';
 import { EvolutionService } from './evolution.service';
 import { UserService } from '../user/user.service';
-import { SetWebSocketConfigDto, ToggleAlwaysOnlineDto, ToggleGroupsIgnoreDto, ToggleReadMessagesDto, ToggleReadStatusDto, ToggleRejectCallDto, ToggleSyncFullHistoryDto, UpdateInstanceSettingsDto } from './dto/instance-settings.dto';
+import {
+  SetWebSocketConfigDto,
+  ToggleAlwaysOnlineDto,
+  ToggleGroupsIgnoreDto,
+  ToggleReadMessagesDto,
+  ToggleReadStatusDto,
+  ToggleRejectCallDto,
+  ToggleSyncFullHistoryDto,
+  UpdateInstanceSettingsDto,
+} from './dto/instance-settings.dto';
 
 @Controller('evolution')
 export class EvolutionController {
@@ -38,7 +47,6 @@ export class EvolutionController {
     @Inject(forwardRef(() => UserService))
     private readonly userService: UserService,
   ) {}
-  // ...otros métodos...
 
   @Post('message')
   @UseInterceptors(FileInterceptor('file'))
@@ -66,6 +74,17 @@ export class EvolutionController {
         if (uploadResult.status !== 'success') {
           return uploadResult;
         }
+        // Guardar el mensaje en la base de datos usando sendMessageToEvolution
+        await this.evolutionService.sendMessageToEvolution(
+          uploadResult.type === 'image'
+            ? 'image'
+            : uploadResult.type === 'audio'
+              ? 'audio'
+              : 'text',
+          numberTarget,
+          uploadResult.url || '',
+          userData.id,
+        );
         return {
           status: 'success',
           message: uploadResult.message,
