@@ -147,6 +147,18 @@ export class MessageController {
         form.append('conversationId', createMessageDto.conversationId || '');
         form.append('locationId', createMessageDto.locationId || '');
 
+        // Buscar token de GoHighLevel
+        const user = await this.userService.findByLocationId(
+          createMessageDto.locationId || '1',
+        );
+        const accessToken = user?.ghlAuth?.access_token;
+        if (!accessToken) {
+          throw new HttpException(
+            'No se encontró el token de GoHighLevel para este usuario',
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+
         let uploadResponse;
         try {
           uploadResponse = await axios.post(
@@ -157,6 +169,7 @@ export class MessageController {
                 ...form.getHeaders(),
                 Accept: 'application/json',
                 Version: '2021-04-15',
+                Authorization: `Bearer ${accessToken}`,
               },
               maxContentLength: Infinity,
               maxBodyLength: Infinity,
