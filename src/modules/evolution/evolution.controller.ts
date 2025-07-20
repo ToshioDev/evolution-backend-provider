@@ -186,9 +186,19 @@ export class EvolutionController {
             message: 'No se recibió URL del archivo desde GHL',
           };
         }
+
+        // Determinar tipo de archivo para el mensaje
+        let tipo = '[archivo]';
+        if (['jpg', 'jpeg', 'png'].includes(ext)) tipo = '[imagen]';
+        else if (['mp4', 'mpeg'].includes(ext)) tipo = '[video]';
+        else if (['mp3', 'wav'].includes(ext)) tipo = '[audio]';
+        else if (['pdf'].includes(ext)) tipo = '[pdf]';
+        else if (['doc', 'docx', 'txt'].includes(ext)) tipo = '[documento]';
+        else if (['zip', 'rar'].includes(ext)) tipo = '[comprimido]';
+
         return {
           status: 'success',
-          message: 'Archivo subido y validado correctamente',
+          message: tipo,
           url,
         };
       } else if (message && typeof message === 'string') {
