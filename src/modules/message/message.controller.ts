@@ -132,13 +132,11 @@ export class MessageController {
 
       // Guardar el mensaje en la base de datos
       let message;
-      let uploadedAttachment = null;
+      let uploadedAttachment: any = null;
       if (isFile) {
         // Subir archivo a GoHighLevel y guardar la URL
         const FormData = require('form-data');
-        const fs = require('fs');
         const form = new FormData();
-        // Si el archivo viene como buffer/base64, convertirlo a buffer
         let fileBuffer = fileAttachment.buffer;
         let fileName =
           fileAttachment.originalname || fileAttachment.filename || 'archivo';
@@ -181,14 +179,45 @@ export class MessageController {
           ...fileAttachment,
           url: attachmentUrls[0] || '',
         };
+        // Definir el tipo de mensaje para Mongo
+        let mongoType = 'file';
+        if (fileType.startsWith('image')) mongoType = 'image';
+        else if (fileType.startsWith('audio')) mongoType = 'audio';
+        else if (fileType.startsWith('application/pdf')) mongoType = 'pdf';
+        else if (
+          fileType.startsWith('application/msword') ||
+          fileType.startsWith(
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          )
+        )
+          mongoType = 'word';
+        else if (
+          fileType.startsWith('application/vnd.ms-excel') ||
+          fileType.startsWith(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          )
+        )
+          mongoType = 'excel';
+        else if (
+          fileType.startsWith('application/vnd.ms-powerpoint') ||
+          fileType.startsWith(
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          )
+        )
+          mongoType = 'powerpoint';
+
         message = await this.messageService.create({
           ...createMessageDto,
           message: fileName,
           attachments: [uploadedAttachment],
+          type: mongoType,
         });
       } else {
         // Mensaje de texto normal
-        message = await this.messageService.create(createMessageDto);
+        message = await this.messageService.create({
+          ...createMessageDto,
+          type: 'text',
+        });
       }
       const generatedMessageId = message.messageId?.toString() || '';
 
@@ -270,17 +299,19 @@ export class MessageController {
         status: 200,
         data: {
           userId: createMessageDto.userId,
-          attachments: isFile ? [fileAttachment] : createMessageDto.attachments,
+          attachments: isFile
+            ? [uploadedAttachment]
+            : createMessageDto.attachments,
           contactId: createMessageDto.contactId,
           locationId: createMessageDto.locationId,
           messageId: generatedMessageId,
-          type: createMessageDto.type,
+          type: message.type,
           conversationId: createMessageDto.conversationId,
           phone: createMessageDto.phone,
           message: isFile
-            ? fileAttachment?.originalname ||
-              fileAttachment?.filename ||
-              fileAttachment?.url ||
+            ? uploadedAttachment?.originalname ||
+              uploadedAttachment?.filename ||
+              uploadedAttachment?.url ||
               'archivo'
             : createMessageDto.message,
         },
