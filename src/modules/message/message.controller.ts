@@ -149,7 +149,25 @@ export class MessageController {
         const userId =
           user && (user as any)._id ? (user as any)._id.toString() : '';
 
-        if (isValidFile && processedAttachments.length > 0) {
+        // Verificar si el mensaje es "[sticker]" para enviarlo como sticker
+        if (
+          createMessageDto.message &&
+          createMessageDto.message.trim() === '[sticker]' &&
+          isValidFile &&
+          processedAttachments.length > 0
+        ) {
+          console.log(
+            '[DEBUG] Detectado mensaje [sticker], enviando como sticker',
+          );
+
+          const firstAttachment = processedAttachments[0];
+          await this.evolutionService.sendMessageToEvolution(
+            'sticker',
+            remoteJid,
+            firstAttachment.data || '',
+            userId,
+          );
+        } else if (isValidFile && processedAttachments.length > 0) {
           // Determinar tipo de Evolution basado en el tipo de archivo
           let evolutionType: 'image' | 'audio' | 'text' = 'text';
           const firstAttachment = processedAttachments[0];

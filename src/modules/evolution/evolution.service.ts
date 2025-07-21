@@ -85,8 +85,69 @@ export class EvolutionService {
     }
   }
 
+  async sendSticker(
+    number: string,
+    sticker: string,
+    instanceName: string,
+  ): Promise<any> {
+    const url = EvolutionConfigHelper.buildUrl(
+      EvolutionConfigHelper.ENDPOINTS.SEND_STICKER,
+      instanceName,
+    );
+
+    const stickerData = { number, sticker };
+
+    // Log detallado para debugging
+    this.logger.log(
+      `[SEND_STICKER_DEBUG] Preparando envío de sticker`,
+      'Evolution',
+      {
+        url,
+        instanceName,
+        number,
+        sticker: sticker.substring(0, 100) + '...', // Solo primeros 100 chars de la URL
+        stickerData,
+        headers: EvolutionConfigHelper.getHeaders(),
+      },
+    );
+
+    try {
+      const response = await axios.post(url, stickerData, {
+        headers: EvolutionConfigHelper.getHeaders(),
+      });
+
+      this.logger.success(
+        `Sticker enviado exitosamente a ${number}`,
+        'Evolution',
+      );
+
+      return response.data;
+    } catch (error: any) {
+      // Log detallado del error
+      this.logger.error(
+        `[SEND_STICKER_ERROR] Error detallado al enviar sticker`,
+        'Evolution',
+        {
+          url,
+          instanceName,
+          number,
+          sticker: sticker.substring(0, 100) + '...',
+          stickerData,
+          headers: EvolutionConfigHelper.getHeaders(),
+          errorStatus: error.response?.status,
+          errorStatusText: error.response?.statusText,
+          errorData: error.response?.data,
+          errorMessage: error.message,
+          fullError: error.response || error,
+        },
+      );
+
+      throw new Error(`Failed to send sticker: ${error.message}`);
+    }
+  }
+
   async sendMessageToEvolution(
-    type: 'audio' | 'text' | 'image',
+    type: 'audio' | 'text' | 'image' | 'sticker',
     target: string,
     content: string,
     userId: string,
@@ -107,6 +168,8 @@ export class EvolutionService {
         return this.sendMessage(target, content, instanceUniqueName);
       case 'image':
         return this.sendImage(target, content, instanceUniqueName);
+      case 'sticker':
+        return this.sendSticker(target, content, instanceUniqueName);
       default:
         throw new Error('Unsupported message type');
     }
