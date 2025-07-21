@@ -4,11 +4,17 @@ import {
   Body,
   HttpStatus,
   HttpException,
+  UseInterceptors,
+  UploadedFile,
+  Query,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { MessageService } from './message.service';
 import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';
-import axios from 'axios';
+import { UploadResponse, GHLUploadResponse } from './dto/upload-file.dto';
+import { Message } from './message.schema';
+import axios, { AxiosResponse } from 'axios';
 
 @Controller('message')
 export class MessageController {
@@ -18,15 +24,19 @@ export class MessageController {
     private readonly evolutionService: EvolutionService,
   ) {}
 
-  @Post()
-  async create(@Body() createMessageDto: any) {
-    this.messageService.logIncomingMessageBody(createMessageDto);
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('fileAttachment'))
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('conversationId') conversationId?: string,
+    @Query('locationId') locationId?: string,
+  ) {
     try {
-      let isFile = false;
-      let fileType = '';
-      let fileAttachment: any = null;
-      let uploadedAttachment: any = null;
-      let message;
+      if (!file) {
+        throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
+      }
+
+      // Validate file type
       const allowedExtensions = [
         'jpg',
         'jpeg',
@@ -42,233 +52,239 @@ export class MessageController {
         'mp3',
         'wav',
       ];
-      const extensionToMime: Record<string, string> = {
-        jpg: 'image/jpeg',
-        jpeg: 'image/jpeg',
-        png: 'image/png',
-        mp4: 'video/mp4',
-        mpeg: 'video/mpeg',
-        zip: 'application/zip',
-        rar: 'application/vnd.rar',
-        pdf: 'application/pdf',
-        doc: 'application/msword',
-        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        txt: 'text/plain',
-        mp3: 'audio/mpeg',
-        wav: 'audio/wav',
-      };
 
-      // Normalizar attachments: siempre debe ser array de objetos {type, data}
-      if (
-        Array.isArray(createMessageDto.attachments) &&
-        createMessageDto.attachments.length > 0
-      ) {
-        createMessageDto.attachments = createMessageDto.attachments.map(
-          (att: any) => {
-            let url = att;
-            if (typeof att === 'object' && att.data) url = att.data;
-            if (typeof att === 'object' && att.type && att.data) return att;
-            const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
-            const ext = extMatch ? extMatch[1].toLowerCase() : '';
-            // type simple para front: image, audio, video, pdf, word, excel, archive, text, file
-            let type = 'file';
-            if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
-              type = 'image';
-            else if (['mp3', 'wav', 'ogg', 'aac'].includes(ext)) type = 'audio';
-            else if (
-              ['mp4', 'mpeg', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(ext)
-            )
-              type = 'video';
-            else if (ext === 'pdf') type = 'pdf';
-            else if (['doc', 'docx'].includes(ext)) type = 'word';
-            else if (['xls', 'xlsx'].includes(ext)) type = 'excel';
-            else if (['zip', 'rar'].includes(ext)) type = 'archive';
-            else if (ext === 'txt') type = 'text';
-            return { type, data: url };
-          },
+      const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
+      if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+        throw new HttpException(
+          `File type not allowed. Allowed types: ${allowedExtensions.join(', ')}`,
+          HttpStatus.BAD_REQUEST,
         );
       }
-      // Imprimir para depuración
-      console.log(
-        '[DEBUG] attachments normalizados:',
-        createMessageDto.attachments,
+
+      // Get user token for GoHighLevel
+      const user = await this.userService.findByLocationId(locationId || '1');
+      const accessToken = user?.ghlAuth?.access_token;
+
+      if (!accessToken) {
+        throw new HttpException(
+          'GoHighLevel access token not found for this location',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // Prepare form data for GoHighLevel upload
+      const FormData = require('form-data');
+      const form = new FormData();
+
+      form.append('fileAttachment', file.buffer, {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+
+      if (conversationId) {
+        form.append('conversationId', conversationId);
+      }
+      if (locationId) {
+        form.append('locationId', locationId);
+      }
+
+      // Upload to GoHighLevel
+      const uploadResponse = await axios.post(
+        'https://services.leadconnectorhq.com/conversations/messages/upload',
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),
+            Accept: 'application/json',
+            Version: '2021-04-15',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        },
       );
 
-      // Detectar si es archivo válido
-      if (
+      const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
+
+      return {
+        status: 200,
+        message: 'File uploaded successfully',
+        data: {
+          attachmentUrls,
+          originalName: file.originalname,
+          size: file.size,
+          mimetype: file.mimetype,
+        },
+      };
+    } catch (error: any) {
+      console.error('Upload error:', error.message);
+
+      if (error.response?.status === 404) {
+        throw new HttpException(
+          'GoHighLevel upload endpoint not found. Please check the API URL and version.',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      throw new HttpException(
+        error.message || 'File upload failed',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post()
+  async create(@Body() createMessageDto: any) {
+    this.messageService.logIncomingMessageBody(createMessageDto);
+
+    try {
+      const allowedExtensions = [
+        'jpg',
+        'jpeg',
+        'png',
+        'mp4',
+        'mpeg',
+        'zip',
+        'rar',
+        'pdf',
+        'doc',
+        'docx',
+        'txt',
+        'mp3',
+        'wav',
+      ];
+
+      // Función para determinar el tipo de archivo basado en la extensión
+      const getFileType = (url: string): string => {
+        const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
+        const ext = extMatch ? extMatch[1].toLowerCase() : '';
+
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
+          return 'image';
+        if (['mp3', 'wav', 'ogg', 'aac'].includes(ext)) return 'audio';
+        if (['mp4', 'mpeg', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(ext))
+          return 'video';
+        if (ext === 'pdf') return 'pdf';
+        if (['doc', 'docx'].includes(ext)) return 'word';
+        if (['xls', 'xlsx'].includes(ext)) return 'excel';
+        if (['zip', 'rar'].includes(ext)) return 'archive';
+        if (ext === 'txt') return 'text';
+        return 'file';
+      };
+
+      // Verificar si el mensaje contiene archivos
+      const hasAttachments =
         Array.isArray(createMessageDto.attachments) &&
-        createMessageDto.attachments.length > 0
-      ) {
-        fileAttachment = createMessageDto.attachments[0];
-        if (fileAttachment && fileAttachment.mimetype) {
-          const ext = Object.keys(extensionToMime).find(
-            (key) => extensionToMime[key] === fileAttachment.mimetype,
-          );
-          if (ext && allowedExtensions.includes(ext)) {
-            isFile = true;
-            fileType = fileAttachment.mimetype;
+        createMessageDto.attachments.length > 0;
+
+      let isValidFile = false;
+      let processedAttachments: any[] = [];
+      let messageType = 'text';
+
+      if (hasAttachments) {
+        // Procesar attachments
+        processedAttachments = createMessageDto.attachments.map((att: any) => {
+          let url = '';
+          let type = 'file';
+
+          // Extraer URL del attachment
+          if (typeof att === 'string') {
+            url = att;
+          } else if (typeof att === 'object' && att.data) {
+            url = att.data;
+            type = att.type || getFileType(url);
+          } else if (typeof att === 'object' && att.url) {
+            url = att.url;
+            type = att.type || getFileType(url);
           }
-        } else if (fileAttachment && fileAttachment.data) {
-          const url = fileAttachment.data;
+
+          // Verificar si es un archivo válido
           const extMatch = url.match(/\.([a-zA-Z0-9]+)$/);
           const ext = extMatch ? extMatch[1].toLowerCase() : '';
+
           if (allowedExtensions.includes(ext)) {
-            isFile = true;
-            fileType = extensionToMime[ext] || 'application/octet-stream';
+            isValidFile = true;
+            type = getFileType(url);
           }
-        }
-      }
 
-      // Validar mensaje de texto si no es archivo
-      if (!isFile) {
-        if (
-          !createMessageDto.message ||
-          createMessageDto.message.trim() === ''
-        ) {
-          throw new HttpException(
-            'El mensaje no puede estar vacío',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-      }
-
-      // Guardar el mensaje en la base de datos
-      if (isFile) {
-        // Subir archivo a GoHighLevel y guardar la URL
-        const FormData = require('form-data');
-        const form = new FormData();
-        let fileBuffer = fileAttachment.buffer;
-        let fileName =
-          fileAttachment.originalname || fileAttachment.filename || 'archivo';
-        if (!fileBuffer && fileAttachment.base64) {
-          fileBuffer = Buffer.from(fileAttachment.base64, 'base64');
-        }
-        form.append('fileAttachment', fileBuffer, fileName);
-        form.append('conversationId', createMessageDto.conversationId || '');
-        form.append('locationId', createMessageDto.locationId || '');
-
-        // Buscar token de GoHighLevel
-        const user = await this.userService.findByLocationId(
-          createMessageDto.locationId || '1',
-        );
-        const accessToken = user?.ghlAuth?.access_token;
-        if (!accessToken) {
-          throw new HttpException(
-            'No se encontró el token de GoHighLevel para este usuario',
-            HttpStatus.UNAUTHORIZED,
-          );
-        }
-
-        let uploadResponse;
-        try {
-          uploadResponse = await axios.post(
-            'https://services.leadconnectorhq.com/conversations/messages/upload',
-            form,
-            {
-              headers: {
-                ...form.getHeaders(),
-                Accept: 'application/json',
-                Version: '2021-04-15',
-                Authorization: `Bearer ${accessToken}`,
-              },
-              maxContentLength: Infinity,
-              maxBodyLength: Infinity,
-            },
-          );
-        } catch (uploadError) {
-          console.error(
-            'Error subiendo archivo a GoHighLevel:',
-            'MessageController',
-            uploadError.message,
-          );
-          throw new HttpException(
-            'Error subiendo archivo a GoHighLevel: ' + uploadError.message,
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
-        const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
-        // type simple para front
-        let ext = '';
-        if (attachmentUrls[0]) {
-          const extMatch = attachmentUrls[0].match(/\.([a-zA-Z0-9]+)$/);
-          ext = extMatch ? extMatch[1].toLowerCase() : '';
-        }
-        let type = 'file';
-        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext))
-          type = 'image';
-        else if (['mp3', 'wav', 'ogg', 'aac'].includes(ext)) type = 'audio';
-        else if (
-          ['mp4', 'mpeg', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(ext)
-        )
-          type = 'video';
-        else if (ext === 'pdf') type = 'pdf';
-        else if (['doc', 'docx'].includes(ext)) type = 'word';
-        else if (['xls', 'xlsx'].includes(ext)) type = 'excel';
-        else if (['zip', 'rar'].includes(ext)) type = 'archive';
-        else if (ext === 'txt') type = 'text';
-
-        uploadedAttachment = {
-          type,
-          data: attachmentUrls[0] || '',
-        };
-        // Definir el tipo de mensaje para Mongo
-        let mongoType = type;
-
-        // Asegurar que messageId esté presente
-        const mongoMessageId =
-          createMessageDto.messageId ||
-          `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-
-        message = await this.messageService.create({
-          ...createMessageDto,
-          message: fileName,
-          attachments: [uploadedAttachment],
-          type: mongoType,
-          messageId: mongoMessageId,
+          return { type, data: url };
         });
-      } else if (
-        Array.isArray(createMessageDto.attachments) &&
-        createMessageDto.attachments.length > 0 &&
-        typeof createMessageDto.attachments[0] === 'object' &&
-        createMessageDto.attachments[0] !== null &&
-        'type' in createMessageDto.attachments[0]
+
+        messageType = processedAttachments[0]?.type || 'file';
+      }
+
+      console.log('[DEBUG] Processed attachments:', processedAttachments);
+      console.log('[DEBUG] Is valid file:', isValidFile);
+      console.log('[DEBUG] Message type:', messageType);
+
+      // Validar que hay contenido (mensaje o archivo válido)
+      if (
+        !isValidFile &&
+        (!createMessageDto.message || createMessageDto.message.trim() === '')
       ) {
-        // attachments ya normalizados arriba
-        message = await this.messageService.create({
-          ...createMessageDto,
-          attachments: createMessageDto.attachments,
-          type: createMessageDto.attachments[0].type || 'file',
-        });
-      } else {
-        // Mensaje de texto normal
-        message = await this.messageService.create({
-          ...createMessageDto,
-          type: 'text',
-        });
+        throw new HttpException(
+          'El mensaje debe contener texto o un archivo válido',
+          HttpStatus.BAD_REQUEST,
+        );
       }
+
+      // Generar messageId si no existe
+      const messageId =
+        createMessageDto.messageId ||
+        `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+
+      // Preparar datos para guardar en MongoDB
+      const messageData = {
+        userId: createMessageDto.userId,
+        contactId: createMessageDto.contactId,
+        locationId: createMessageDto.locationId,
+        conversationId: createMessageDto.conversationId,
+        phone: createMessageDto.phone,
+        messageId: messageId,
+        typeMessage: 'OUTBOUND',
+        type: messageType,
+        message:
+          createMessageDto.message || (isValidFile ? 'Archivo adjunto' : ''),
+        attachments: processedAttachments,
+      };
+
+      // Guardar mensaje en MongoDB
+      const message = await this.messageService.create(messageData);
 
       // Buscar usuario y enviar mensaje a Evolution
       const user = await this.userService.findByLocationId(
         createMessageDto.locationId || '1',
       );
+
       try {
         const remoteJid = (createMessageDto.phone || '').replace('+', '');
         const userId =
           user && (user as any)._id ? (user as any)._id.toString() : '';
-        if (isFile) {
+
+        if (isValidFile && processedAttachments.length > 0) {
+          // Determinar tipo de Evolution basado en el tipo de archivo
           let evolutionType: 'image' | 'audio' | 'text' = 'text';
-          if (fileType.startsWith('image')) evolutionType = 'image';
-          else if (fileType.startsWith('audio')) evolutionType = 'audio';
-          else if (fileType.startsWith('video')) evolutionType = 'image';
-          else evolutionType = 'image';
+          const firstAttachment = processedAttachments[0];
+
+          if (
+            firstAttachment.type === 'image' ||
+            firstAttachment.type === 'video'
+          ) {
+            evolutionType = 'image';
+          } else if (firstAttachment.type === 'audio') {
+            evolutionType = 'audio';
+          } else {
+            evolutionType = 'image'; // Para otros tipos de archivos, usar como imagen
+          }
+
           await this.evolutionService.sendMessageToEvolution(
             evolutionType,
             remoteJid,
-            uploadedAttachment?.data || '',
+            firstAttachment.data || '',
             userId,
           );
         } else {
+          // Enviar mensaje de texto
           await this.evolutionService.sendMessageToEvolution(
             'text',
             remoteJid,
@@ -276,7 +292,7 @@ export class MessageController {
             userId,
           );
         }
-      } catch (evoError) {
+      } catch (evoError: any) {
         console.error(
           '[ERROR] Error sending message via EvolutionService:',
           'MessageController',
@@ -316,9 +332,7 @@ export class MessageController {
         data: {
           userId: createMessageDto.userId,
           attachments:
-            isFile && uploadedAttachment
-              ? [uploadedAttachment]
-              : createMessageDto.attachments,
+            processedAttachments.length > 0 ? processedAttachments : [],
           contactId: createMessageDto.contactId,
           locationId: createMessageDto.locationId,
           messageId: message.messageId,
@@ -326,9 +340,7 @@ export class MessageController {
           conversationId: createMessageDto.conversationId,
           phone: createMessageDto.phone,
           message:
-            isFile && uploadedAttachment
-              ? uploadedAttachment.data
-              : createMessageDto.message,
+            createMessageDto.message || (isValidFile ? 'Archivo adjunto' : ''),
         },
         savedMessage: message,
         timestamp: new Date().toISOString(),
