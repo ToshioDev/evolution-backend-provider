@@ -26,18 +26,35 @@ export class EvolutionService {
     this.configService.logModuleConfig('evolution');
   }
 
-  async sendAudio(audio: string, instanceName: string): Promise<any> {
+  async sendAudio(
+    number: string,
+    audio: string,
+    instanceName: string,
+  ): Promise<any> {
     const url = EvolutionConfigHelper.buildUrl(
       EvolutionConfigHelper.ENDPOINTS.SEND_AUDIO,
       instanceName,
     );
 
-    try {
-      const response = await axios.post(
+    const audioData = { number, audio };
+
+    // Log detallado para debugging
+    this.logger.log(
+      `[SEND_AUDIO_DEBUG] Preparando envío de audio`,
+      'Evolution',
+      {
         url,
-        { audio },
-        { headers: EvolutionConfigHelper.getHeaders() },
-      );
+        instanceName,
+        audio: audio.substring(0, 100) + '...', // Solo primeros 100 chars de la URL
+        audioData,
+        headers: EvolutionConfigHelper.getHeaders(),
+      },
+    );
+
+    try {
+      const response = await axios.post(url, audioData, {
+        headers: EvolutionConfigHelper.getHeaders(),
+      });
 
       this.logger.success(
         `Audio enviado exitosamente a instancia: ${instanceName}`,
@@ -45,12 +62,25 @@ export class EvolutionService {
       );
 
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // Log detallado del error
       this.logger.error(
-        `Error al enviar audio a instancia: ${instanceName}`,
+        `[SEND_AUDIO_ERROR] Error detallado al enviar audio`,
         'Evolution',
-        error.message,
+        {
+          url,
+          instanceName,
+          audio: audio.substring(0, 100) + '...',
+          audioData,
+          headers: EvolutionConfigHelper.getHeaders(),
+          errorStatus: error.response?.status,
+          errorStatusText: error.response?.statusText,
+          errorData: error.response?.data,
+          errorMessage: error.message,
+          fullError: error.response || error,
+        },
       );
+
       throw new Error(`Failed to send audio: ${error.message}`);
     }
   }
@@ -72,7 +102,7 @@ export class EvolutionService {
 
     switch (type) {
       case 'audio':
-        return this.sendAudio(content, instanceUniqueName);
+        return this.sendAudio(target, content, instanceUniqueName);
       case 'text':
         return this.sendMessage(target, content, instanceUniqueName);
       case 'image':
