@@ -88,7 +88,7 @@ export class EvolutionService {
     instanceName: string,
   ): Promise<any> {
     const url = EvolutionConfigHelper.buildUrl(
-      EvolutionConfigHelper.ENDPOINTS.SEND_WHATSAPP,
+      EvolutionConfigHelper.ENDPOINTS.SEND_MEDIA,
       instanceName,
     );
 

@@ -8,7 +8,6 @@ import {
   UploadedFile,
   Query,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { MessageService } from './message.service';
 import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';

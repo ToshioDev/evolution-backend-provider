@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class EvolutionConfigHelper {
-
   static readonly BASE_URL = process.env.EVOLUTION_API_URL || '';
   static readonly API_KEY = process.env.EVOLUTION_API_KEY || '';
 
@@ -27,8 +26,9 @@ export class EvolutionConfigHelper {
     UPDATE_SETTINGS: '/settings/set',
     SET_WEBSOCKET: '/websocket/set',
     SEND_TEXT: '/message/sendText',
-    SEND_WHATSAPP: '/message/sendWhatsapp',
+    SEND_MEDIA: '/message/sendMedia',
     SEND_AUDIO: '/message/sendWhatsAppAudio',
+    SEND_STICKER: '/message/sendSticker',
   };
 
   static readonly MESSAGE_TYPES = {

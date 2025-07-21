@@ -132,7 +132,7 @@ export class EvolutionInstanceHelper {
    * Construye datos de mensaje según el tipo
    */
   static buildMessageData(
-    type: 'text' | 'image' | 'audio',
+    type: 'text' | 'image' | 'audio' | 'video' | 'document',
     target: string,
     content: string,
   ): any {
@@ -143,6 +143,10 @@ export class EvolutionInstanceHelper {
         return { ...baseData, text: content };
       case 'image':
         return { ...baseData, mediatype: 'image', media: content };
+      case 'video':
+        return { ...baseData, mediatype: 'video', media: content };
+      case 'document':
+        return { ...baseData, mediatype: 'document', media: content };
       case 'audio':
         return { audio: content };
       default:
@@ -158,7 +162,7 @@ export class EvolutionInstanceHelper {
       case 'text':
         return EvolutionConfigHelper.ENDPOINTS.SEND_TEXT;
       case 'image':
-        return EvolutionConfigHelper.ENDPOINTS.SEND_WHATSAPP;
+        return EvolutionConfigHelper.ENDPOINTS.SEND_MEDIA;
       case 'audio':
         return EvolutionConfigHelper.ENDPOINTS.SEND_AUDIO;
       default:
