@@ -12,9 +12,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { MessageService } from './message.service';
 import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';
-import { UploadResponse, GHLUploadResponse } from './dto/upload-file.dto';
-import { Message } from './message.schema';
-import axios, { AxiosResponse } from 'axios';
+import axios from 'axios';
 
 @Controller('message')
 export class MessageController {
@@ -23,6 +21,115 @@ export class MessageController {
     private readonly userService: UserService,
     private readonly evolutionService: EvolutionService,
   ) {}
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('fileAttachment'))
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('conversationId') conversationId?: string,
+    @Query('locationId') locationId?: string,
+  ) {
+    try {
+      if (!file) {
+        throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
+      }
+
+      // Validate file type
+      const allowedExtensions = [
+        'jpg',
+        'jpeg',
+        'png',
+        'mp4',
+        'mpeg',
+        'zip',
+        'rar',
+        'pdf',
+        'doc',
+        'docx',
+        'txt',
+        'mp3',
+        'wav',
+      ];
+
+      const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
+      if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+        throw new HttpException(
+          `File type not allowed. Allowed types: ${allowedExtensions.join(', ')}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Get user token for GoHighLevel
+      const user = await this.userService.findByLocationId(locationId || '1');
+      const accessToken = user?.ghlAuth?.access_token;
+
+      if (!accessToken) {
+        throw new HttpException(
+          'GoHighLevel access token not found for this location',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // Prepare form data for GoHighLevel upload
+      const FormData = require('form-data');
+      const form = new FormData();
+
+      form.append('fileAttachment', file.buffer, {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+
+      if (conversationId) {
+        form.append('conversationId', conversationId);
+      }
+      if (locationId) {
+        form.append('locationId', locationId);
+      }
+
+      // Upload to GoHighLevel
+      const uploadResponse = await axios.post(
+        'https://services.leadconnectorhq.com/conversations/messages/upload',
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),
+            Accept: 'application/json',
+            Version: '2021-04-15',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        },
+      );
+
+      const attachmentUrls = uploadResponse?.data?.attachmentUrls || [];
+
+      return {
+        status: 200,
+        message: 'File uploaded successfully',
+        data: {
+          attachmentUrls,
+          originalName: file.originalname,
+          size: file.size,
+          mimetype: file.mimetype,
+        },
+      };
+    } catch (error: any) {
+      console.error('Upload error:', error.message);
+
+      if (error.response?.status === 404) {
+        throw new HttpException(
+          'GoHighLevel upload endpoint not found. Please check the API URL and version.',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      throw new HttpException(
+        error.message || 'File upload failed',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 
   @Post()
   async create(@Body() createMessageDto: any) {

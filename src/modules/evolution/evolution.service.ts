@@ -607,16 +607,20 @@ export class EvolutionService {
 
     // Preestablecer eventos si no se pasan
     const defaultEvents = [
-      "CHATS_SET",
-      "CHATS_UPDATE",
-      "CHATS_UPSERT",
-      "MESSAGES_DELETE",
-      "MESSAGES_SET",
-      "MESSAGES_UPDATE",
-      "MESSAGES_UPSERT",
-      "SEND_MESSAGE"
+      'CHATS_SET',
+      'CHATS_UPDATE',
+      'CHATS_UPSERT',
+      'MESSAGES_DELETE',
+      'MESSAGES_SET',
+      'MESSAGES_UPDATE',
+      'MESSAGES_UPSERT',
+      'SEND_MESSAGE',
     ];
-    if (!websocketConfig.events || !Array.isArray(websocketConfig.events) || websocketConfig.events.length === 0) {
+    if (
+      !websocketConfig.events ||
+      !Array.isArray(websocketConfig.events) ||
+      websocketConfig.events.length === 0
+    ) {
       websocketConfig.events = defaultEvents;
     }
 
@@ -651,8 +655,13 @@ export class EvolutionService {
       );
 
       // Guardar hasWebSocket en la instancia correspondiente
-      const user = await this.userService.findOneByEvolutionInstanceName(instanceName);
-      if (user && user.evolutionInstances && Array.isArray(user.evolutionInstances)) {
+      const user =
+        await this.userService.findOneByEvolutionInstanceName(instanceName);
+      if (
+        user &&
+        user.evolutionInstances &&
+        Array.isArray(user.evolutionInstances)
+      ) {
         const updatedInstances = user.evolutionInstances.map((instance) => {
           if (
             instance.name === instanceName ||
@@ -666,7 +675,10 @@ export class EvolutionService {
           }
           return instance;
         });
-        await this.userService.setUserEvolutionInstances(user.id.toString(), updatedInstances);
+        await this.userService.setUserEvolutionInstances(
+          user.id.toString(),
+          updatedInstances,
+        );
 
         // Lógica para uwebsockets
         if (typeof websocketConfig.enabled === 'boolean') {
@@ -680,7 +692,7 @@ export class EvolutionService {
                 enabled: true,
                 events: websocketConfig.events || [],
               },
-              { upsert: true, new: true }
+              { upsert: true, new: true },
             );
           } else {
             // Eliminar el uwebsocket
