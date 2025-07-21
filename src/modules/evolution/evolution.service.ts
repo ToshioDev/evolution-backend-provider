@@ -98,6 +98,20 @@ export class EvolutionService {
       media,
     );
 
+    // Log detallado para debugging
+    this.logger.log(
+      `[SEND_IMAGE_DEBUG] Preparando envío de imagen`,
+      'Evolution',
+      {
+        url,
+        instanceName,
+        number,
+        media: media.substring(0, 100) + '...', // Solo primeros 100 chars de la URL
+        messageData,
+        headers: EvolutionConfigHelper.getHeaders(),
+      },
+    );
+
     try {
       const response = await axios.post(url, messageData, {
         headers: EvolutionConfigHelper.getHeaders(),
@@ -109,12 +123,26 @@ export class EvolutionService {
       );
 
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // Log detallado del error
       this.logger.error(
-        `Error al enviar imagen a ${number}`,
+        `[SEND_IMAGE_ERROR] Error detallado al enviar imagen`,
         'Evolution',
-        error.message,
+        {
+          url,
+          instanceName,
+          number,
+          media: media.substring(0, 100) + '...',
+          messageData,
+          headers: EvolutionConfigHelper.getHeaders(),
+          errorStatus: error.response?.status,
+          errorStatusText: error.response?.statusText,
+          errorData: error.response?.data,
+          errorMessage: error.message,
+          fullError: error.response || error,
+        },
       );
+
       throw new Error(`Failed to send image: ${error.message}`);
     }
   }
@@ -480,11 +508,40 @@ export class EvolutionService {
 
   async getPrimaryInstanceForUser(userId: string): Promise<any> {
     try {
+      this.logger.log(
+        `[GET_PRIMARY_INSTANCE_DEBUG] Buscando instancia primaria para usuario: ${userId}`,
+        'Evolution',
+      );
+
       const user = await this.userService.findById(userId);
 
       if (!user || !user.evolutionInstances) {
+        this.logger.error(
+          `[GET_PRIMARY_INSTANCE_ERROR] Usuario no encontrado o sin instancias`,
+          'Evolution',
+          {
+            userId,
+            userExists: !!user,
+            hasInstances: !!user?.evolutionInstances,
+          },
+        );
         throw new Error('User not found or no instances available');
       }
+
+      this.logger.log(
+        `[GET_PRIMARY_INSTANCE_DEBUG] Usuario encontrado con ${user.evolutionInstances.length} instancias`,
+        'Evolution',
+        {
+          userId,
+          instancesCount: user.evolutionInstances.length,
+          instances: user.evolutionInstances.map((inst) => ({
+            id: inst.id,
+            name: inst.name,
+            isPrimary: inst.isPrimary,
+            connectionStatus: inst.connectionStatus,
+          })),
+        },
+      );
 
       const primaryInstance = user.evolutionInstances.find(
         (instance) => instance.isPrimary === true,
@@ -493,22 +550,53 @@ export class EvolutionService {
       if (!primaryInstance) {
         const firstInstance = user.evolutionInstances[0];
         if (!firstInstance) {
+          this.logger.error(
+            `[GET_PRIMARY_INSTANCE_ERROR] No hay instancias disponibles`,
+            'Evolution',
+            { userId },
+          );
           throw new Error('No instances available for this user');
         }
+
+        this.logger.log(
+          `[GET_PRIMARY_INSTANCE_DEBUG] No hay instancia primaria, usando la primera disponible`,
+          'Evolution',
+          {
+            userId,
+            selectedInstance: {
+              id: firstInstance.id,
+              name: firstInstance.name,
+              connectionStatus: firstInstance.connectionStatus,
+            },
+          },
+        );
+
         return firstInstance;
       }
 
       this.logger.log(
-        `Instancia primaria encontrada para usuario: ${userId}`,
+        `[GET_PRIMARY_INSTANCE_DEBUG] Instancia primaria encontrada`,
         'Evolution',
+        {
+          userId,
+          primaryInstance: {
+            id: primaryInstance.id,
+            name: primaryInstance.name,
+            connectionStatus: primaryInstance.connectionStatus,
+          },
+        },
       );
 
       return primaryInstance;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
-        `Error al obtener instancia primaria para usuario: ${userId}`,
+        `[GET_PRIMARY_INSTANCE_ERROR] Error al obtener instancia primaria`,
         'Evolution',
-        error.message,
+        {
+          userId,
+          errorMessage: error.message,
+          fullError: error,
+        },
       );
       throw new Error(`Failed to get primary instance: ${error.message}`);
     }

@@ -22,7 +22,6 @@ export class MessageController {
     private readonly evolutionService: EvolutionService,
   ) {}
 
- 
   @Post()
   async create(@Body() createMessageDto: any) {
     this.messageService.logIncomingMessageBody(createMessageDto);
