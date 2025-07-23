@@ -314,7 +314,12 @@ export class EvolutionService {
       throw new Error('Failed to update user with new instance');
     }
 
-    return this.createInstance(basicData);
+    const instanceResult = await this.createInstance(basicData);
+
+    // Activar WebSocket automáticamente al crear la instancia
+    await this.setWebSocketConfig(instanceName, { enabled: true });
+
+    return instanceResult;
   }
 
   async getInstanceByName(instanceName: string): Promise<any> {
