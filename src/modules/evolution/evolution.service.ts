@@ -317,7 +317,7 @@ export class EvolutionService {
     const instanceResult = await this.createInstance(basicData);
 
     // Activar WebSocket automáticamente al crear la instancia
-    await this.setWebSocketConfig(instanceName, { enabled: true });
+    /*await this.setWebSocketConfig(instanceName, { enabled: true });*/
 
     return instanceResult;
   }
