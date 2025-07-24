@@ -9,10 +9,16 @@ import { MessageModule } from './modules/message/message.module';
 import { TokenRefreshService } from './modules/oauth/token-refresh.service';
 import { CommonModule } from './common/common.module';
 import { ConfigurationService } from './common/configuration/configuration.service';
+import { BullModule } from '@nestjs/bull';
 
 @Module({
   imports: [
     CommonModule,
+    BullModule.forRootAsync({
+      useFactory: () => ({
+        redis: process.env.REDIS_URL || 'redis://localhost:6379',
+      }),
+    }),
     MongooseModule.forRootAsync({
       useFactory: (configService: ConfigurationService) => ({
         uri: configService.getMongoUri(),

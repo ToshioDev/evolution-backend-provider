@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { BullModule } from '@nestjs/bull';
 import { MessageController } from './message.controller';
 import { MessageService } from './message.service';
 import { Message, MessageSchema } from './message.schema';
@@ -10,12 +11,15 @@ import { CommonModule } from '../../common/common.module';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Message.name, schema: MessageSchema }]),
+    BullModule.registerQueue({
+      name: 'message-queue',
+    }),
     CommonModule,
     UserModule,
     EvolutionModule,
   ],
   controllers: [MessageController],
-  providers: [MessageService],
+  providers: [MessageService, require('./message.processor').MessageProcessor],
   exports: [MessageService],
 })
 export class MessageModule {}
