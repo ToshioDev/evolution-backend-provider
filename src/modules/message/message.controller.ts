@@ -7,12 +7,26 @@ import {
   UseInterceptors,
   UploadedFile,
   Query,
+  Get,
+  Param,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { MessageService } from './message.service';
 import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';
+import {
+  MessagesResponseDto,
+  MessageQueryDto,
+} from './dto/message-response.dto';
 import axios from 'axios';
 
+@ApiTags('Messages')
 @Controller('message')
 export class MessageController {
   constructor(
@@ -250,6 +264,252 @@ export class MessageController {
         },
         savedMessage: message,
         timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Get('sent/:locationId')
+  @ApiOperation({ summary: 'Obtener mensajes enviados por locationId' })
+  @ApiParam({ name: 'locationId', description: 'ID de la ubicación' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Límite de mensajes por página',
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'contactId',
+    required: false,
+    description: 'ID del contacto para filtrar',
+  })
+  @ApiQuery({
+    name: 'conversationId',
+    required: false,
+    description: 'ID de la conversación para filtrar',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Mensajes enviados obtenidos exitosamente',
+    type: MessagesResponseDto,
+  })
+  async getSentMessages(
+    @Param('locationId') locationId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+    @Query('contactId') contactId?: string,
+    @Query('conversationId') conversationId?: string,
+  ) {
+    try {
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+
+      const result = await this.messageService.findSentMessages(
+        locationId,
+        pageNum,
+        limitNum,
+        contactId,
+        conversationId,
+      );
+
+      return {
+        status: 200,
+        data: {
+          messages: result.messages,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: result.total,
+            totalPages: Math.ceil(result.total / limitNum),
+          },
+        },
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Get('received/:locationId')
+  @ApiOperation({ summary: 'Obtener mensajes recibidos por locationId' })
+  @ApiParam({ name: 'locationId', description: 'ID de la ubicación' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Límite de mensajes por página',
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'contactId',
+    required: false,
+    description: 'ID del contacto para filtrar',
+  })
+  @ApiQuery({
+    name: 'conversationId',
+    required: false,
+    description: 'ID de la conversación para filtrar',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Mensajes recibidos obtenidos exitosamente',
+    type: MessagesResponseDto,
+  })
+  async getReceivedMessages(
+    @Param('locationId') locationId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+    @Query('contactId') contactId?: string,
+    @Query('conversationId') conversationId?: string,
+  ) {
+    try {
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+
+      const result = await this.messageService.findReceivedMessages(
+        locationId,
+        pageNum,
+        limitNum,
+        contactId,
+        conversationId,
+      );
+
+      return {
+        status: 200,
+        data: {
+          messages: result.messages,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: result.total,
+            totalPages: Math.ceil(result.total / limitNum),
+          },
+        },
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Get('conversation/:locationId/:conversationId')
+  @ApiOperation({
+    summary: 'Obtener todos los mensajes de una conversación específica',
+  })
+  @ApiParam({ name: 'locationId', description: 'ID de la ubicación' })
+  @ApiParam({ name: 'conversationId', description: 'ID de la conversación' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Límite de mensajes por página',
+    example: 50,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Mensajes de la conversación obtenidos exitosamente',
+    type: MessagesResponseDto,
+  })
+  async getConversationMessages(
+    @Param('locationId') locationId: string,
+    @Param('conversationId') conversationId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '50',
+  ) {
+    try {
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+
+      const result = await this.messageService.findConversationMessages(
+        locationId,
+        conversationId,
+        pageNum,
+        limitNum,
+      );
+
+      return {
+        status: 200,
+        data: {
+          messages: result.messages,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: result.total,
+            totalPages: Math.ceil(result.total / limitNum),
+          },
+        },
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Get('contact/:locationId/:contactId')
+  @ApiOperation({
+    summary: 'Obtener todos los mensajes de un contacto específico',
+  })
+  @ApiParam({ name: 'locationId', description: 'ID de la ubicación' })
+  @ApiParam({ name: 'contactId', description: 'ID del contacto' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Límite de mensajes por página',
+    example: 50,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Mensajes del contacto obtenidos exitosamente',
+    type: MessagesResponseDto,
+  })
+  async getContactMessages(
+    @Param('locationId') locationId: string,
+    @Param('contactId') contactId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '50',
+  ) {
+    try {
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+
+      const result = await this.messageService.findContactMessages(
+        locationId,
+        contactId,
+        pageNum,
+        limitNum,
+      );
+
+      return {
+        status: 200,
+        data: {
+          messages: result.messages,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: result.total,
+            totalPages: Math.ceil(result.total / limitNum),
+          },
+        },
       };
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);

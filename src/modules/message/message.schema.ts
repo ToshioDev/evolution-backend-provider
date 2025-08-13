@@ -23,6 +23,9 @@ export class Message {
   @Prop({ required: true })
   type: string;
 
+  @Prop({ required: true, enum: ['INBOUND', 'OUTBOUND'], default: 'OUTBOUND' })
+  typeMessage: string;
+
   @Prop({ required: true })
   conversationId: string;
 
@@ -31,6 +34,12 @@ export class Message {
 
   @Prop({ required: true })
   message: string;
+
+  @Prop()
+  createdAt?: Date;
+
+  @Prop()
+  updatedAt?: Date;
 
   [key: string]: any;
 }
