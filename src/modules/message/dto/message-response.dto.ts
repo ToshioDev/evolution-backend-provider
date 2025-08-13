@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+﻿import { ApiProperty } from '@nestjs/swagger';
 
 export class MessageDto {
   @ApiProperty()
@@ -59,16 +59,7 @@ export class MessagesResponseDto {
   @ApiProperty()
   status: number;
 
-  @ApiProperty({
-    type: 'object',
-    properties: {
-      messages: {
-        type: 'array',
-        items: { $ref: '#/components/schemas/MessageDto' },
-      },
-      pagination: { $ref: '#/components/schemas/PaginationDto' },
-    },
-  })
+  @ApiProperty()
   data: {
     messages: MessageDto[];
     pagination: PaginationDto;
