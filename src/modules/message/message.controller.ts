@@ -22,6 +22,7 @@ import { UserService } from '../user/user.service';
 import { EvolutionService } from '../evolution/evolution.service';
 import {
   MessagesResponseDto,
+  MessagesWithClientInfoResponseDto,
   MessageQueryDto,
 } from './dto/message-response.dto';
 import axios from 'axios';
@@ -319,6 +320,83 @@ export class MessageController {
         contactId,
         conversationId,
       );
+
+      return {
+        status: 200,
+        data: {
+          messages: result.messagesGroupedByClient,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: result.total,
+            totalPages: Math.ceil(result.total / limitNum),
+            totalClients: result.totalClients,
+          },
+        },
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Get('chats/:instanceName/:locationId')
+  @ApiOperation({
+    summary:
+      'Obtener mensajes agrupados por cliente con información personalizada (nombre, foto)',
+  })
+  @ApiParam({
+    name: 'instanceName',
+    description: 'Nombre de la instancia de Evolution',
+  })
+  @ApiParam({ name: 'locationId', description: 'ID de la ubicación' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Límite de mensajes por página',
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'contactId',
+    required: false,
+    description: 'ID del contacto para filtrar',
+  })
+  @ApiQuery({
+    name: 'conversationId',
+    required: false,
+    description: 'ID de la conversación para filtrar',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Chats con información del cliente obtenidos exitosamente',
+    type: MessagesWithClientInfoResponseDto,
+  })
+  async getChatsWithClientInfo(
+    @Param('instanceName') instanceName: string,
+    @Param('locationId') locationId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+    @Query('contactId') contactId?: string,
+    @Query('conversationId') conversationId?: string,
+  ) {
+    try {
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+
+      const result =
+        await this.messageService.findMessagesGroupedByClientWithProfile(
+          instanceName,
+          locationId,
+          pageNum,
+          limitNum,
+          contactId,
+          conversationId,
+        );
 
       return {
         status: 200,
