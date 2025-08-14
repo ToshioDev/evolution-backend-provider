@@ -271,7 +271,7 @@ export class MessageController {
   }
 
   @Get('sent/:locationId')
-  @ApiOperation({ summary: 'Obtener mensajes enviados por locationId' })
+  @ApiOperation({ summary: 'Obtener mensajes enviados agrupados por cliente' })
   @ApiParam({ name: 'locationId', description: 'ID de la ubicación' })
   @ApiQuery({
     name: 'page',
@@ -297,7 +297,8 @@ export class MessageController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Mensajes enviados obtenidos exitosamente',
+    description:
+      'Mensajes enviados agrupados por cliente obtenidos exitosamente',
     type: MessagesResponseDto,
   })
   async getSentMessages(
@@ -311,7 +312,7 @@ export class MessageController {
       const pageNum = parseInt(page, 10);
       const limitNum = parseInt(limit, 10);
 
-      const result = await this.messageService.findSentMessages(
+      const result = await this.messageService.findMessagesGroupedByClient(
         locationId,
         pageNum,
         limitNum,
@@ -322,12 +323,13 @@ export class MessageController {
       return {
         status: 200,
         data: {
-          messages: result.messages,
+          messages: result.messagesGroupedByClient,
           pagination: {
             page: pageNum,
             limit: limitNum,
             total: result.total,
             totalPages: Math.ceil(result.total / limitNum),
+            totalClients: result.totalClients,
           },
         },
       };
@@ -363,7 +365,8 @@ export class MessageController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Mensajes recibidos obtenidos exitosamente',
+    description:
+      'Mensajes recibidos agrupados por cliente obtenidos exitosamente',
     type: MessagesResponseDto,
   })
   async getReceivedMessages(
@@ -377,7 +380,7 @@ export class MessageController {
       const pageNum = parseInt(page, 10);
       const limitNum = parseInt(limit, 10);
 
-      const result = await this.messageService.findReceivedMessages(
+      const result = await this.messageService.findMessagesGroupedByClient(
         locationId,
         pageNum,
         limitNum,
@@ -388,12 +391,13 @@ export class MessageController {
       return {
         status: 200,
         data: {
-          messages: result.messages,
+          messages: result.messagesGroupedByClient,
           pagination: {
             page: pageNum,
             limit: limitNum,
             total: result.total,
             totalPages: Math.ceil(result.total / limitNum),
+            totalClients: result.totalClients,
           },
         },
       };

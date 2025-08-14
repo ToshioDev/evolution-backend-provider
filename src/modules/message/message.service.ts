@@ -170,4 +170,64 @@ export class MessageService {
 
     return { messages, total };
   }
+
+  /**
+   * Agrupa los mensajes por número de cliente (teléfono)
+   */
+  async findMessagesGroupedByClient(
+    locationId: string,
+    page = 1,
+    limit = 20,
+    contactId?: string,
+    conversationId?: string,
+  ): Promise<{
+    messagesGroupedByClient: { [phone: string]: Message[] };
+    total: number;
+    totalClients: number;
+  }> {
+    const skip = (page - 1) * limit;
+
+    const filter: any = {
+      locationId,
+    };
+
+    if (contactId) {
+      filter.contactId = contactId;
+    }
+
+    if (conversationId) {
+      filter.conversationId = conversationId;
+    }
+
+    // Obtener todos los mensajes que coinciden con el filtro
+    const [messages, total] = await Promise.all([
+      this.messageModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.messageModel.countDocuments(filter),
+    ]);
+
+    // Agrupar mensajes por número de teléfono
+    const messagesGroupedByClient: { [phone: string]: Message[] } = {};
+
+    messages.forEach((message) => {
+      const clientPhone = message.phone;
+      if (!messagesGroupedByClient[clientPhone]) {
+        messagesGroupedByClient[clientPhone] = [];
+      }
+      messagesGroupedByClient[clientPhone].push(message);
+    });
+
+    // Contar el número total de clientes únicos
+    const totalClients = Object.keys(messagesGroupedByClient).length;
+
+    return {
+      messagesGroupedByClient,
+      total,
+      totalClients,
+    };
+  }
 }

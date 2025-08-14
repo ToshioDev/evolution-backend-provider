@@ -53,15 +53,49 @@ export class PaginationDto {
 
   @ApiProperty()
   totalPages: number;
+
+  @ApiProperty({
+    description: 'Número total de clientes únicos',
+    required: false,
+  })
+  totalClients?: number;
 }
 
 export class MessagesResponseDto {
   @ApiProperty()
   status: number;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Mensajes agrupados por número de cliente',
+    example: {
+      '1234567890': [
+        {
+          _id: '1',
+          phone: '1234567890',
+          message: 'Hola',
+          typeMessage: 'INBOUND',
+        },
+        {
+          _id: '2',
+          phone: '1234567890',
+          message: 'Adiós',
+          typeMessage: 'OUTBOUND',
+        },
+      ],
+      '0987654321': [
+        {
+          _id: '3',
+          phone: '0987654321',
+          message: 'Hola mundo',
+          typeMessage: 'INBOUND',
+        },
+      ],
+    },
+  })
   data: {
-    messages: MessageDto[];
+    messages: {
+      [cliente: string]: MessageDto[];
+    };
     pagination: PaginationDto;
   };
 }
